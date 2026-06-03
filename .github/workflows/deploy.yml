@@ -1,0 +1,129 @@
+name: Deploy StayNaivasha
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # ── Stage 1: CI ──────────────────────────────────────────────────────────────
+  ci:
+    name: Lint, Type Check, Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt ruff mypy pytest pip-audit
+        working-directory: .
+
+      - name: Ruff lint
+        run: ruff check backend/
+
+      - name: Mypy type check
+        run: mypy backend/app --ignore-missing-imports
+
+      - name: pip-audit (dependency scan)
+        run: pip-audit -r backend/requirements.txt
+
+      - name: Pytest
+        run: pytest backend/ -q
+        env:
+          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          REDIS_URL: ${{ secrets.TEST_REDIS_URL }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      - name: ESLint
+        run: npm run lint
+        working-directory: frontend
+
+      - name: TypeScript check
+        run: npm run typecheck
+        working-directory: frontend
+
+      - name: npm audit
+        run: npm audit --audit-level=high
+        working-directory: frontend
+
+      - name: Vitest
+        run: npm run test
+        working-directory: frontend
+
+  # ── Stage 2: Staging ─────────────────────────────────────────────────────────
+  staging:
+    name: Deploy to Staging
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy backend to Railway staging
+        run: |
+          npx @railway/cli@latest up --service backend --environment staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        working-directory: backend
+
+      - name: Deploy frontend to Vercel preview
+        run: npx vercel --token ${{ secrets.VERCEL_TOKEN }} --yes
+        working-directory: frontend
+
+      - name: Smoke tests
+        run: |
+          sleep 10
+          curl -f ${{ secrets.STAGING_URL }}/api/health || exit 1
+
+  # ── Stage 3: Production — blue-green ─────────────────────────────────────────
+  production:
+    name: Deploy to Production
+    needs: staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy backend to Railway production (green)
+        run: npx @railway/cli@latest up --service backend --environment production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        working-directory: backend
+
+      - name: Health check green
+        id: healthcheck
+        run: |
+          sleep 15
+          curl -f ${{ secrets.PRODUCTION_URL }}/api/health || echo "HEALTH_FAILED=true" >> $GITHUB_ENV
+
+      - name: Auto-rollback on failure
+        if: env.HEALTH_FAILED == 'true'
+        run: |
+          npx @railway/cli@latest rollback --service backend --environment production
+          curl -X POST "https://api.africastalking.com/version1/messaging" \
+            -H "apiKey: ${{ secrets.AT_API_KEY }}" \
+            -d "username=${{ secrets.AT_USERNAME }}&to=${{ secrets.FOUNDER_PHONE }}&message=ROLLBACK: StayNaivasha deploy failed. Previous version restored."
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy frontend to Vercel production
+        if: env.HEALTH_FAILED != 'true'
+        run: npx vercel --token ${{ secrets.VERCEL_TOKEN }} --prod --yes
+        working-directory: frontend
+
+      - name: Notify Sentry of release
+        if: env.HEALTH_FAILED != 'true'
+        run: |
+          curl -X POST "https://sentry.io/api/0/organizations/${{ secrets.SENTRY_ORG }}/releases/" \
+            -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"version": "${{ github.sha }}", "projects": ["staynaivasha"]}'

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /owner
+Disallow: /admin
+
+Sitemap: https://staynaivasha.co.ke/sitemap.xml

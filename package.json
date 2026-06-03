@@ -1,0 +1,13 @@
+{
+  "name": "staynaivasha",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"frontend,backend\" --prefix-colors \"cyan,green\" \"npm run dev --prefix frontend\" \"bash -c 'cd backend && .venv/bin/uvicorn main:app --reload --port 8000'\"",
+    "install:frontend": "npm install --prefix frontend",
+    "setup": "npm install && npm run install:frontend && bash -c 'cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt'"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
