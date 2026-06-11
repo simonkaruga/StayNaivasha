@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import Depends, HTTPException, Cookie, status
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +27,21 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+async def get_current_user_optional(
+    access_token: str | None = Cookie(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    if not access_token:
+        return None
+    try:
+        payload = decode_token(access_token)
+        user_id: str = payload["sub"]
+    except JWTError:
+        return None
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
 
 
 async def require_owner(user: User = Depends(get_current_user)) -> User:

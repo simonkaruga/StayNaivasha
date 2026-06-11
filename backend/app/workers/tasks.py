@@ -33,8 +33,7 @@ async def _send_booking_notifications_async(booking_id: str) -> None:
         guest_result = await db.execute(select(User).where(User.id == booking.guest_id))
         guest = guest_result.scalar_one_or_none()
 
-        owner_result = await db.execute(select(User).where(User.id == prop.owner_id)) if prop else None
-        owner = (await owner_result).scalar_one_or_none() if owner_result else None
+        owner = (await db.execute(select(User).where(User.id == prop.owner_id))).scalar_one_or_none() if prop else None
 
         if guest and prop:
             await _send_sms(
@@ -106,7 +105,7 @@ async def _release_payout_async(booking_id: str) -> None:
                 "https://api.safaricom.co.ke/mpesa/b2c/v1/paymentrequest",
                 json={
                     "InitiatorName": settings.MPESA_SHORTCODE,
-                    "SecurityCredential": "",  # Encrypted in production
+                    "SecurityCredential": settings.MPESA_SECURITY_CREDENTIAL,
                     "CommandID": "BusinessPayment",
                     "Amount": payout_amount,
                     "PartyA": settings.MPESA_SHORTCODE,
@@ -141,15 +140,32 @@ async def _release_payout_async(booking_id: str) -> None:
 @celery.task
 def send_push_notification(user_id: str, title: str, body: str) -> None:
     """FCM push — max 3/user/day, quiet hours 22:00–07:00 EAT."""
-    from datetime import datetime, timezone, timedelta
     import pytz
+    from datetime import datetime
 
     eat = pytz.timezone("Africa/Nairobi")
     now_eat = datetime.now(eat)
     if now_eat.hour >= 22 or now_eat.hour < 7:
         return  # Respect quiet hours
 
-    asyncio.run(_send_push_async(user_id, title, body))
+    asyncio.run(_check_and_send_push(user_id, title, body))
+
+
+async def _check_and_send_push(user_id: str, title: str, body: str) -> None:
+    from app.core.redis import redis
+    from datetime import date
+
+    key = f"push_daily:{user_id}:{date.today().isoformat()}"
+    try:
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, 86400)
+        if count > 3:
+            return  # Cap: max 3 push notifications per user per day
+    except Exception:
+        pass  # Redis unavailable — allow through
+
+    await _send_push_async(user_id, title, body)
 
 
 async def _send_push_async(user_id: str, title: str, body: str) -> None:
@@ -278,7 +294,7 @@ async def _process_refund_async(booking_id: str, refund_amount: int) -> None:
                 "https://api.safaricom.co.ke/mpesa/b2c/v1/paymentrequest",
                 json={
                     "InitiatorName": settings.MPESA_SHORTCODE,
-                    "SecurityCredential": "",
+                    "SecurityCredential": settings.MPESA_SECURITY_CREDENTIAL,
                     "CommandID": "BusinessPayment",
                     "Amount": refund_amount,
                     "PartyA": settings.MPESA_SHORTCODE,

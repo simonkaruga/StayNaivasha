@@ -15,6 +15,8 @@ class OTPVerify(BaseModel):
 class TokenResponse(BaseModel):
     user_id: str
     role: str
+    phone: Optional[str] = None
+    name: Optional[str] = None
 
 
 # ── Properties ───────────────────────────────────────────────────────────────
@@ -37,6 +39,8 @@ class PropertyCreate(BaseModel):
     what3words: Optional[str] = None
     landmark_instructions: Optional[str] = None
     min_nights: int = 1
+    no_checkout_days: Optional[str] = None  # comma-separated day numbers e.g. "0,6"
+    response_time_hours: Optional[int] = None
     cancellation_policy: str = "moderate"
 
 class PropertyOut(BaseModel):
@@ -51,7 +55,9 @@ class PropertyOut(BaseModel):
     landmark_instructions: Optional[str]
     verified_tier: int
     min_nights: int
+    no_checkout_days: Optional[str]
     response_time_hours: Optional[int]
+    cancellation_policy: str = "moderate"
     active: bool
     images: list[PropertyImageOut] = []
 
@@ -67,6 +73,8 @@ class PropertyListOut(BaseModel):
     primary_image: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
+    avg_rating: Optional[float] = None
+    review_count: Optional[int] = None
 
     class Config:
         from_attributes = True

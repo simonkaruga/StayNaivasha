@@ -10,6 +10,11 @@ import Profile from "./pages/Profile";
 import OwnerLayout from "./pages/owner/OwnerLayout";
 import AdminLayout from "./pages/admin/AdminLayout";
 import BottomNav from "./components/BottomNav";
+import NotFound from "./pages/NotFound";
+import Legal from "./pages/Legal";
+import HowItWorks from "./pages/HowItWorks";
+import About from "./pages/About";
+import OwnerApply from "./pages/OwnerApply";
 
 export default function App() {
   return (
@@ -28,6 +33,13 @@ export default function App() {
               <Route path="/saved"                     element={<Saved />} />
               <Route path="/bookings"                  element={<Bookings />} />
               <Route path="/profile"                   element={<Profile />} />
+              <Route path="/terms"                     element={<Legal page="terms" />} />
+              <Route path="/privacy"                   element={<Legal page="privacy" />} />
+              <Route path="/cancellation-policy"       element={<Legal page="cancellation" />} />
+              <Route path="/how-it-works"              element={<HowItWorks />} />
+              <Route path="/about"                     element={<About />} />
+              <Route path="/list-your-property"        element={<OwnerApply />} />
+              <Route path="*"                          element={<NotFound />} />
             </Routes>
             <BottomNav />
           </>

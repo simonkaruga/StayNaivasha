@@ -2,16 +2,16 @@ import random
 import string
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, rate_limit
 from app.models.models import User, Property, Booking, Availability, PromoCode
 from app.schemas.schemas import BookingCreate, BookingOut
 from app.services.escrow import acquire_lock, release_lock
-from app.services.mpesa import stk_push
 
 router = APIRouter(tags=["bookings"])
 
@@ -149,7 +149,7 @@ async def get_booking(
 @router.post("/{booking_id}/checkin", status_code=status.HTTP_204_NO_CONTENT)
 async def confirm_checkin(
     booking_id: str,
-    code: str,
+    code: str = Query(...),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -210,11 +210,22 @@ async def cancel_booking(
 
     refund_amount = int(booking.total_amount * refund_pct / 100)
     booking.status = "cancelled"
+    await db.execute(delete(Availability).where(Availability.booking_id == booking.id))
     await db.commit()
 
     # Queue refund task if applicable
     if refund_amount > 0 and booking.mpesa_ref:
         from app.workers.tasks import process_refund
         process_refund.delay(booking_id, refund_amount)
+
+    # Email notification
+    from app.services.email import send_email, booking_cancelled_html
+    from sqlalchemy import select as sa_select
+    from app.models.models import Property as Prop
+    guest = (await db.execute(sa_select(User).where(User.id == booking.guest_id))).scalar_one_or_none()
+    prop  = (await db.execute(sa_select(Prop).where(Prop.id == booking.property_id))).scalar_one_or_none()
+    if guest and guest.email and prop:
+        await send_email(guest.email, f"Booking cancelled · {prop.title}",
+            booking_cancelled_html(guest.name or "", prop.title, refund_amount))
 
     return {"status": "cancelled", "refund_pct": refund_pct, "refund_amount": refund_amount}

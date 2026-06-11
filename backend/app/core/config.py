@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     MPESA_SHORTCODE: str = ""
     MPESA_PASSKEY: str = ""
     MPESA_CALLBACK_URL: str = "https://staynaivasha.co.ke/api/payments/mpesa/callback"
+    MPESA_SECURITY_CREDENTIAL: str = ""  # RSA-encrypted initiator password from Safaricom portal
 
     # Africa's Talking SMS + OTP
     AT_API_KEY: str = ""

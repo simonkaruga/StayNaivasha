@@ -27,7 +27,7 @@ class User(Base):
     name: Mapped[Optional[str]] = mapped_column(String(120))
     phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(Enum("guest", "owner", "admin", name="user_role"), default="guest")
+    role: Mapped[str] = mapped_column(Enum("guest", "owner", "admin", "banned", name="user_role"), default="guest")
     national_id_url: Mapped[Optional[str]] = mapped_column(String(500))
     passport_number: Mapped[Optional[str]] = mapped_column(String(50))
     fcm_token: Mapped[Optional[str]] = mapped_column(String(500))
@@ -55,6 +55,7 @@ class Property(Base):
     min_nights: Mapped[int] = mapped_column(SmallInteger, default=1)
     no_checkout_days: Mapped[Optional[str]] = mapped_column(String(20))  # e.g. "0,6" (Sun,Sat)
     response_time_hours: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    cancellation_policy: Mapped[str] = mapped_column(String(30), default="moderate")
     ical_import_url: Mapped[Optional[str]] = mapped_column(String(500))
     active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -160,6 +161,27 @@ class AuditLog(Base):
     entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
     actor_id: Mapped[Optional[str]] = mapped_column(String(100))
     metadata_json: Mapped[Optional[dict]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class OwnerApplication(Base):
+    __tablename__ = "owner_applications"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String(255))
+    national_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    property_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    property_location: Mapped[str] = mapped_column(String(200), nullable=False)
+    property_description: Mapped[Optional[str]] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        Enum("pending", "approved", "rejected", name="application_status"), default="pending"
+    )
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text)
+    reviewed_by: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

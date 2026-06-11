@@ -255,6 +255,112 @@ function OwnerVerification() {
   );
 }
 
+// ── Applications ─────────────────────────────────────────────────────────────
+
+function Applications() {
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState("pending");
+  const [reviewing, setReviewing] = useState<string | null>(null);
+
+  const { data: apps, isLoading } = useQuery({
+    queryKey: ["admin-applications", filter],
+    queryFn: async () => {
+      const res = await api(`/applications/admin/list?status_filter=${filter}`);
+      if (!res.ok) throw new Error("failed");
+      return res.json();
+    },
+  });
+
+  async function review(id: string, status: "approved" | "rejected", reason?: string) {
+    setReviewing(id);
+    await api(`/applications/admin/${id}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, rejection_reason: reason ?? null }),
+    });
+    queryClient.invalidateQueries({ queryKey: ["admin-applications"] });
+    setReviewing(null);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="font-semibold text-[var(--text-primary)]">
+          Owner applications
+          {apps?.length > 0 && filter === "pending" && (
+            <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{apps.length}</span>
+          )}
+        </h1>
+        <select value={filter} onChange={e => setFilter(e.target.value)} className="text-xs border border-[var(--border)] rounded-lg px-2 py-1 bg-[var(--bg-surface)] text-[var(--text-primary)]">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+
+      {isLoading && <Spinner />}
+
+      {!isLoading && apps?.length === 0 && (
+        <div className="text-center py-12 text-[var(--text-muted)]">
+          <p className="text-3xl mb-2">✓</p>
+          <p className="text-sm">No {filter} applications</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {apps?.map((a: any) => (
+          <div key={a.id} className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-3 border border-[var(--border)]">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold text-[var(--text-primary)] text-sm">{a.full_name}</p>
+                <p className="text-xs text-[var(--text-muted)]">{a.phone} {a.email ? `· ${a.email}` : ""}</p>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                a.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                a.status === "approved" ? "bg-green-100 text-green-700" :
+                "bg-red-100 text-red-600"
+              }`}>{a.status}</span>
+            </div>
+
+            <div className="bg-[var(--bg-primary)] rounded-xl p-3 space-y-1 text-xs">
+              <div className="flex gap-2"><span className="text-[var(--text-muted)] w-20 flex-shrink-0">National ID</span><span className="font-mono text-[var(--text-primary)] font-semibold">{a.national_id}</span></div>
+              <div className="flex gap-2"><span className="text-[var(--text-muted)] w-20 flex-shrink-0">Type</span><span className="text-[var(--text-primary)] capitalize">{a.property_type}</span></div>
+              <div className="flex gap-2"><span className="text-[var(--text-muted)] w-20 flex-shrink-0">Location</span><span className="text-[var(--text-primary)]">{a.property_location}</span></div>
+              {a.property_description && (
+                <div className="flex gap-2"><span className="text-[var(--text-muted)] w-20 flex-shrink-0">Notes</span><span className="text-[var(--text-primary)]">{a.property_description}</span></div>
+              )}
+              <div className="flex gap-2"><span className="text-[var(--text-muted)] w-20 flex-shrink-0">Applied</span><span className="text-[var(--text-primary)]">{new Date(a.created_at).toLocaleDateString()}</span></div>
+            </div>
+
+            {a.status === "pending" && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => review(a.id, "approved")}
+                  disabled={reviewing === a.id}
+                  className="flex-1 bg-[var(--color-forest)] text-white text-xs font-bold py-2.5 rounded-xl disabled:opacity-50">
+                  ✓ Approve
+                </button>
+                <button
+                  onClick={() => {
+                    const reason = prompt("Rejection reason (will be shown to applicant):");
+                    if (reason !== null) review(a.id, "rejected", reason);
+                  }}
+                  disabled={reviewing === a.id}
+                  className="flex-1 bg-red-500 text-white text-xs font-bold py-2.5 rounded-xl disabled:opacity-50">
+                  ✕ Reject
+                </button>
+              </div>
+            )}
+            {a.status === "rejected" && a.rejection_reason && (
+              <p className="text-xs text-red-500">Reason: {a.rejection_reason}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Blacklist ─────────────────────────────────────────────────────────────────
 
 function Blacklist() {
@@ -304,6 +410,7 @@ function Blacklist() {
 
 const adminTabs = [
   { to: "/admin", label: "Stats", end: true },
+  { to: "/admin/applications", label: "Applications" },
   { to: "/admin/listings", label: "Listings" },
   { to: "/admin/owners", label: "Owners" },
   { to: "/admin/disputes", label: "Disputes" },
@@ -329,6 +436,7 @@ export default function AdminLayout() {
       <div className="px-4 py-5 max-w-lg mx-auto">
         <Routes>
           <Route path="/" element={<Stats />} />
+          <Route path="/applications" element={<Applications />} />
           <Route path="/listings" element={<PendingListings />} />
           <Route path="/owners" element={<OwnerVerification />} />
           <Route path="/disputes" element={<Disputes />} />

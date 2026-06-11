@@ -2,6 +2,8 @@ import random
 import string
 from datetime import timedelta
 
+from typing import Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,7 +12,7 @@ from app.core.database import get_db
 from app.core.redis import redis
 from app.core.security import create_access_token, create_refresh_token, decode_token
 from app.core.config import settings
-from app.core.deps import rate_limit, get_current_user as get_current_user_optional
+from app.core.deps import rate_limit, get_current_user, get_current_user_optional
 from app.models.models import User
 from app.schemas.schemas import OTPRequest, OTPVerify, TokenResponse
 
@@ -23,7 +25,28 @@ OTP_TTL = 300  # 5 minutes
 async def get_me(user: User = Depends(get_current_user_optional)):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    return TokenResponse(user_id=user.id, role=user.role)
+    return TokenResponse(user_id=user.id, role=user.role, phone=user.phone, name=user.name)
+
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+
+@router.put("/me", response_model=TokenResponse)
+async def update_profile(
+    body: ProfileUpdate,
+    user: User = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if body.name is not None:
+        user.name = body.name.strip() or None
+    if body.email is not None:
+        user.email = body.email.strip() or None
+    await db.commit()
+    await db.refresh(user)
+    return TokenResponse(user_id=user.id, role=user.role, phone=user.phone, name=user.name)
 
 
 def _otp_key(phone: str) -> str:
@@ -35,17 +58,20 @@ def _generate_otp() -> str:
 
 
 async def _send_sms(phone: str, message: str) -> None:
-    """Send SMS via Africa's Talking. Skipped gracefully in dev if key not set."""
+    """Send SMS via Africa's Talking. Always prints OTP to console for dev visibility."""
+    print(f"[OTP] {phone}: {message}")
     if not settings.AT_API_KEY:
-        print(f"[DEV] SMS to {phone}: {message}")
         return
     import httpx
+    is_sandbox = settings.AT_USERNAME == "sandbox"
+    url = "https://api.sandbox.africastalking.com/version1/messaging" if is_sandbox else "https://api.africastalking.com/version1/messaging"
     async with httpx.AsyncClient() as client:
-        await client.post(
-            "https://api.africastalking.com/version1/messaging",
+        r = await client.post(
+            url,
             data={"username": settings.AT_USERNAME, "to": phone, "message": message},
             headers={"apiKey": settings.AT_API_KEY, "Accept": "application/json"},
         )
+        print(f"[AT SMS] status={r.status_code} body={r.text}")
 
 
 # In-memory OTP fallback for dev when Redis is unavailable
@@ -98,7 +124,7 @@ async def verify_otp(body: OTPVerify, response: Response, db: AsyncSession = Dep
         await redis.set(f"refresh:{user.id}", refresh_token, ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400)
 
     _set_cookies(response, access_token, refresh_token)
-    return TokenResponse(user_id=user.id, role=user.role)
+    return TokenResponse(user_id=user.id, role=user.role, phone=user.phone, name=user.name)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -130,7 +156,7 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
         await redis.set(f"refresh:{user_id}", new_refresh, ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400)
 
     _set_cookies(response, new_access, new_refresh)
-    return TokenResponse(user_id=user.id, role=user.role)
+    return TokenResponse(user_id=user.id, role=user.role, phone=user.phone, name=user.name)
 
 
 @router.post("/push-subscribe", status_code=status.HTTP_204_NO_CONTENT)

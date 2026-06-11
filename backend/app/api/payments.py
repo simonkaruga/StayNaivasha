@@ -72,7 +72,8 @@ async def booking_payment_status(
 
 @router.post("/mpesa/callback", status_code=status.HTTP_200_OK)
 async def mpesa_callback(request: Request, db: AsyncSession = Depends(get_db)):
-    client_ip = request.client.host
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    client_ip = forwarded_for.split(",")[0].strip() if forwarded_for else request.client.host
     if client_ip not in SAFARICOM_IPS:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
@@ -86,12 +87,24 @@ async def mpesa_callback(request: Request, db: AsyncSession = Depends(get_db)):
     account_ref = next((i["Value"] for i in metadata if i["Name"] == "AccountReference"), None)
 
     if result_code != 0 or not account_ref:
-        # Payment failed or cancelled — release the date lock
+        # Payment failed or cancelled — release the Redis date lock so guest can retry
+        if account_ref:
+            booking_prefix = account_ref.replace("SN-", "").lower()
+            failed_result = await db.execute(
+                select(Booking).where(Booking.id.like(f"{booking_prefix}%"))
+            )
+            failed_booking = failed_result.scalar_one_or_none()
+            if failed_booking:
+                await release_lock(
+                    failed_booking.property_id,
+                    failed_booking.check_in.isoformat(),
+                    failed_booking.check_out.isoformat(),
+                )
         return {"ResultCode": 0, "ResultDesc": "Accepted"}
 
     booking_prefix = account_ref.replace("SN-", "").lower()
     result = await db.execute(
-        select(Booking).where(Booking.id.startswith(booking_prefix))
+        select(Booking).where(Booking.id.like(f"{booking_prefix}%"))
     )
     booking = result.scalar_one_or_none()
     if not booking:
@@ -148,5 +161,6 @@ async def mpesa_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
 @router.post("/mpesa/b2c", status_code=status.HTTP_204_NO_CONTENT)
 async def trigger_payout():
-    # Called by Celery worker only — not directly by any client
-    pass
+    # Intentional no-op — B2C payouts and refunds are driven exclusively by
+    # Celery tasks (release_escrow_payout, process_refund) which call the
+    # Daraja B2C API directly. This endpoint exists only for documentation.

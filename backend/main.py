@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api import health, auth, properties, bookings, payments, ical, ws, reviews, admin, owner
+from app.api import health, auth, properties, bookings, payments, ical, ws, reviews, admin, owner, applications
 
 sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=0.1)
 
@@ -26,4 +26,5 @@ app.include_router(ical.router,        prefix="/api/ical")
 app.include_router(reviews.router,     prefix="/api/reviews")
 app.include_router(owner.router,       prefix="/api/owner")
 app.include_router(admin.router,       prefix="/api/admin")
+app.include_router(applications.router, prefix="/api/applications")
 app.include_router(ws.router)

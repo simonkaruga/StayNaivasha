@@ -7,7 +7,7 @@ from datetime import date as date_type
 
 from app.core.database import get_db
 from app.core.deps import require_owner
-from app.models.models import User, Property, PropertyImage, Booking, Availability
+from app.models.models import User, Property, PropertyImage, Booking, Availability, DamageClaim
 
 router = APIRouter(tags=["owner"])
 
@@ -181,7 +181,7 @@ async def generate_description(
     import anthropic
     client = anthropic.Anthropic(api_key=settings.CLAUDE_API_KEY)
     message = client.messages.create(
-        model="claude-sonnet-4-5",
+        model="claude-sonnet-4-6",
         max_tokens=300,
         messages=[{
             "role": "user",
@@ -194,6 +194,84 @@ async def generate_description(
         }],
     )
     return {"description": message.content[0].text}
+
+
+# ── Damage claims ─────────────────────────────────────────────────────────────
+
+class DamageClaimCreate(BaseModel):
+    booking_id: str
+    claimed_amount: int
+    description: Optional[str] = None
+
+
+@router.post("/damage-claims", status_code=201)
+async def file_damage_claim(
+    body: DamageClaimCreate,
+    owner: User = Depends(require_owner),
+    db: AsyncSession = Depends(get_db),
+):
+    booking = (await db.execute(
+        select(Booking)
+        .join(Property, Booking.property_id == Property.id)
+        .where(
+            Booking.id == body.booking_id,
+            Property.owner_id == owner.id,
+            Booking.status.in_(["checked_in", "completed"]),
+        )
+    )).scalar_one_or_none()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found or not eligible for a damage claim")
+
+    existing = (await db.execute(
+        select(DamageClaim).where(DamageClaim.booking_id == body.booking_id)
+    )).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="A claim already exists for this booking")
+
+    claim = DamageClaim(
+        booking_id=body.booking_id,
+        claimed_amount=body.claimed_amount,
+        ruling=body.description,
+    )
+    db.add(claim)
+    await db.commit()
+    return {"id": claim.id, "status": claim.status, "claimed_amount": claim.claimed_amount}
+
+
+@router.get("/damage-claims")
+async def list_damage_claims(
+    owner: User = Depends(require_owner),
+    db: AsyncSession = Depends(get_db),
+):
+    props = (await db.execute(select(Property).where(Property.owner_id == owner.id))).scalars().all()
+    property_ids = [p.id for p in props]
+    if not property_ids:
+        return []
+
+    bookings = (await db.execute(
+        select(Booking).where(Booking.property_id.in_(property_ids))
+    )).scalars().all()
+    booking_ids = [b.id for b in bookings]
+    if not booking_ids:
+        return []
+
+    claims = (await db.execute(
+        select(DamageClaim).where(DamageClaim.booking_id.in_(booking_ids)).order_by(DamageClaim.created_at.desc())
+    )).scalars().all()
+
+    booking_map = {b.id: b for b in bookings}
+    return [
+        {
+            "id": c.id,
+            "booking_id": c.booking_id,
+            "check_in": booking_map[c.booking_id].check_in.isoformat() if c.booking_id in booking_map else None,
+            "claimed_amount": c.claimed_amount,
+            "status": c.status,
+            "description": c.ruling,
+            "created_at": c.created_at.isoformat(),
+        }
+        for c in claims
+    ]
 
 
 # ── Seasonal pricing ──────────────────────────────────────────────────────────

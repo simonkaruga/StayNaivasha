@@ -3,9 +3,17 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  test: {
+    environment: "jsdom",
+    globals: true,
+  },
   server: {
     proxy: {
-      "/api": { target: "http://localhost:8000", changeOrigin: true },
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        followRedirects: true,
+      },
     },
   },
   plugins: [
@@ -20,7 +28,7 @@ export default defineConfig({
         swSrc: "src/sw/service-worker.ts",
         swDest: "dist/service-worker.js",
       },
-      devOptions: { enabled: false },
+      devOptions: { enabled: true, type: "module" },
     }),
   ],
   build: {

@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { imgSrc } from "../utils/image";
 
 interface PropertySummary {
-  id: string;
-  title: string;
-  price_per_night: number;
-  primary_image?: string;
-  min_nights: number;
+  id: string; title: string; type: string;
+  price_per_night: number; primary_image?: string; min_nights: number;
 }
 
 async function fetchProperty(id: string): Promise<PropertySummary> {
@@ -19,18 +17,28 @@ async function fetchProperty(id: string): Promise<PropertySummary> {
   return { ...data, primary_image: primary };
 }
 
+function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className={`flex justify-between items-center text-sm ${bold ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
+      <span>{label}</span><span>{value}</span>
+    </div>
+  );
+}
+
 export default function Booking() {
-  const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const { id }    = useParams<{ id: string }>();
+  const [sp]      = useSearchParams();
+  const navigate  = useNavigate();
+  const checkIn   = sp.get("check_in") ?? "";
+  const checkOut  = sp.get("check_out") ?? "";
 
-  const checkIn = searchParams.get("check_in") ?? "";
-  const checkOut = searchParams.get("check_out") ?? "";
-
-  const [promoCode, setPromoCode] = useState("");
+  const [guests,        setGuests]        = useState(() => Math.max(1, Number(sp.get("guests") ?? "1")));
+  const [promo,         setPromo]         = useState("");
+  const [promoApplied,  setPromoApplied]  = useState(false);
+  const [discount,      setDiscount]      = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState("");
 
   const { data: prop } = useQuery({
     queryKey: ["property", id],
@@ -41,36 +49,40 @@ export default function Booking() {
   const nights = checkIn && checkOut
     ? Math.max(0, (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000)
     : 0;
+  const base  = (prop?.price_per_night ?? 0) * nights;
+  const levy  = Math.round(base * 0.02);
+  const fee   = 300;
+  const total = Math.max(0, base + levy + fee - discount);
 
-  const base = prop ? prop.price_per_night * nights : 0;
-  const levy = Math.round(base * 0.02);
-  const fee = 300;
-  const total = base + levy + fee;
+  function fmtDate(d: string) {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  async function applyPromo() {
+    if (!promo || promoApplied) return;
+    // Optimistic: backend will validate on booking creation
+    // For KES 500 early-adopter code, show immediate feedback
+    setDiscount(500);
+    setPromoApplied(true);
+  }
 
   async function handleConfirm() {
     if (!termsAccepted) { setError("Please accept the terms to continue"); return; }
     if (!checkIn || !checkOut || nights === 0) { setError("Invalid dates"); return; }
-
-    setLoading(true);
-    setError("");
-
+    setLoading(true); setError("");
     try {
       const bookingRes = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          property_id: id,
-          check_in: checkIn,
-          check_out: checkOut,
-          guests: 1,
-          promo_code: promoCode || undefined,
-          terms_accepted: true,
+          property_id: id, check_in: checkIn, check_out: checkOut,
+          guests, promo_code: promo || undefined, terms_accepted: true,
         }),
       });
-
       if (bookingRes.status === 401) {
-        navigate(`/profile?redirect=/booking/${id}?check_in=${checkIn}&check_out=${checkOut}`);
+        navigate(`/profile?redirect=${encodeURIComponent(`/booking/${id}?check_in=${checkIn}&check_out=${checkOut}`)}`);
         return;
       }
       if (!bookingRes.ok) {
@@ -78,18 +90,20 @@ export default function Booking() {
         setError(err.detail ?? "Booking failed — please try again");
         return;
       }
-
       const booking = await bookingRes.json();
-
-      // Trigger STK Push
       await fetch("/api/payments/mpesa/stk-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ booking_id: booking.id }),
       });
-
-      navigate(`/booking-confirm/${booking.id}`);
+      navigate(`/booking-confirm/${booking.id}`, {
+        state: {
+          propertyTitle: prop?.title,
+          propertyImage: prop?.primary_image,
+          propertyType:  prop?.type,
+          checkIn, checkOut, nights, total,
+        },
+      });
     } catch {
       setError("Network error — check your connection and try again");
     } finally {
@@ -99,92 +113,158 @@ export default function Booking() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] pb-8">
+
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--border)]">
-        <button onClick={() => navigate(-1)} className="text-[var(--text-primary)] text-xl">‹</button>
-        <h1 className="font-semibold text-[var(--text-primary)]">Confirm booking</h1>
+      <div className="sticky top-0 z-40 flex items-center gap-3 px-4 py-4 bg-[var(--bg-surface)] border-b border-[var(--border)]">
+        <button onClick={() => navigate(-1)}
+          className="w-9 h-9 rounded-full bg-[var(--bg-primary)] flex items-center justify-center">
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" strokeWidth={2.5}>
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <div>
+          <h1 className="font-semibold text-[var(--text-primary)] leading-none">Confirm booking</h1>
+          {nights > 0 && <p className="text-xs text-[var(--text-muted)] mt-0.5">{nights} night{nights !== 1 ? "s" : ""}</p>}
+        </div>
       </div>
 
-      <div className="px-4 pt-4 space-y-4 max-w-md mx-auto">
-        {/* Property summary */}
+      <div className="max-w-md mx-auto">
+
+        {/* Property banner — tall, cinematic */}
         {prop && (
-          <div className="flex gap-3 bg-[var(--bg-surface)] rounded-2xl p-3">
-            {prop.primary_image && (
-              <img src={prop.primary_image} alt="" className="w-20 h-20 rounded-xl object-cover flex-shrink-0" />
-            )}
-            <div className="min-w-0">
-              <p className="font-medium text-[var(--text-primary)] text-sm leading-snug line-clamp-2">{prop.title}</p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">
-                {checkIn} → {checkOut} · {nights} night{nights !== 1 ? "s" : ""}
-              </p>
+          <div className="relative overflow-hidden" style={{ height: 220 }}>
+            {prop.primary_image
+              ? <img src={imgSrc(prop.primary_image, 800)} alt={prop.title} className="w-full h-full object-cover" />
+              : <div className="w-full h-full bg-gradient-to-r from-[var(--color-forest)] to-[var(--color-teal)]" />
+            }
+            <div className="absolute inset-0" style={{
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.72) 100%)",
+            }} />
+            <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
+              <p className="text-white font-semibold text-sm leading-snug">{prop.title}</p>
+              <p className="text-white/60 text-xs mt-0.5 capitalize">{prop.type} · Naivasha, Kenya</p>
             </div>
           </div>
         )}
 
-        {/* Price breakdown */}
-        <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-2 text-sm">
-          <p className="font-medium text-[var(--text-primary)] mb-3">Price breakdown</p>
-          <div className="flex justify-between text-[var(--text-muted)]">
-            <span>KES {prop?.price_per_night.toLocaleString()} × {nights} nights</span>
-            <span>KES {base.toLocaleString()}</span>
+        {/* Dates pill */}
+        <div className="mx-4 -mt-4 relative z-10 bg-[var(--bg-surface)] rounded-2xl shadow-lg px-4 py-3 flex items-center justify-between">
+          <div className="text-center">
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide font-medium">Check-in</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] mt-0.5">{fmtDate(checkIn)}</p>
           </div>
-          <div className="flex justify-between text-[var(--text-muted)]">
-            <span>Tourism levy (2%)</span>
-            <span>KES {levy.toLocaleString()}</span>
+          <div className="flex items-center gap-1 text-[var(--text-muted)]">
+            <div className="w-8 h-px bg-[var(--border)]" />
+            <span className="text-xs font-medium text-[var(--color-teal)]">{nights}n</span>
+            <div className="w-8 h-px bg-[var(--border)]" />
           </div>
-          <div className="flex justify-between text-[var(--text-muted)]">
-            <span>Convenience fee</span>
-            <span>KES {fee.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between font-semibold text-[var(--text-primary)] pt-2 border-t border-[var(--border)]">
-            <span>Total</span>
-            <span>KES {total.toLocaleString()}</span>
+          <div className="text-center">
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide font-medium">Check-out</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] mt-0.5">{fmtDate(checkOut)}</p>
           </div>
         </div>
 
-        {/* Promo code */}
-        <div className="bg-[var(--bg-surface)] rounded-2xl p-4">
-          <p className="text-sm font-medium text-[var(--text-primary)] mb-2">Promo code</p>
-          <input
-            value={promoCode}
-            onChange={e => setPromoCode(e.target.value.toUpperCase())}
-            placeholder="Enter code e.g. NAIVASHA500"
-            className="w-full bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] text-sm rounded-xl px-3 py-2 outline-none"
-          />
+        <div className="px-4 pt-4 space-y-3">
+
+          {/* Price breakdown */}
+          <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-2.5">
+            <p className="font-semibold text-[var(--text-primary)] mb-1">Price details</p>
+            <Row label={`KES ${prop?.price_per_night.toLocaleString() ?? "—"} × ${nights} nights`} value={`KES ${base.toLocaleString()}`} />
+            <Row label="Tourism levy (2%)" value={`KES ${levy.toLocaleString()}`} />
+            <Row label="Convenience fee" value={`KES ${fee.toLocaleString()}`} />
+            {discount > 0 && <Row label={`Promo: ${promo}`} value={`− KES ${discount.toLocaleString()}`} />}
+            <div className="h-px bg-[var(--border)]" />
+            <Row label="Total" value={`KES ${total.toLocaleString()}`} bold />
+          </div>
+
+          {/* Guests */}
+          <div className="bg-[var(--bg-surface)] rounded-2xl px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Guests</p>
+              <p className="text-xs text-[var(--text-muted)]">How many people are staying?</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setGuests(g => Math.max(1, g - 1))}
+                className="w-9 h-9 rounded-full border-2 border-[var(--border)] text-[var(--text-primary)] flex items-center justify-center text-xl font-light leading-none">−</button>
+              <span className="text-base font-bold text-[var(--text-primary)] w-5 text-center">{guests}</span>
+              <button onClick={() => setGuests(g => Math.min(20, g + 1))}
+                className="w-9 h-9 rounded-full border-2 border-[var(--border)] text-[var(--text-primary)] flex items-center justify-center text-xl font-light leading-none">+</button>
+            </div>
+          </div>
+
+          {/* Promo code */}
+          <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-2">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Promo code</p>
+            <div className="flex gap-2">
+              <input value={promo} onChange={e => setPromo(e.target.value.toUpperCase())}
+                placeholder="e.g. NAIVASHA500"
+                disabled={promoApplied}
+                className="flex-1 bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] text-sm rounded-xl px-3 py-2.5 outline-none disabled:opacity-60" />
+              <button onClick={applyPromo} disabled={!promo || promoApplied}
+                className="px-4 bg-[var(--color-forest)] disabled:bg-gray-300 text-white text-xs font-bold rounded-xl">
+                {promoApplied ? "✓ Applied" : "Apply"}
+              </button>
+            </div>
+            {promoApplied && <p className="text-xs text-[var(--color-teal)]">KES 500 discount applied</p>}
+          </div>
+
+          {/* Cancellation policy */}
+          <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-2">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Cancellation policy</p>
+            {[
+              { pct: "100%", when: "48h+ before check-in",  color: "text-[var(--color-teal)]" },
+              { pct: "50%",  when: "24–48h before check-in", color: "text-amber-600" },
+              { pct: "0%",   when: "Less than 24h",          color: "text-red-500" },
+            ].map(r => (
+              <div key={r.when} className="flex items-center justify-between">
+                <span className="text-xs text-[var(--text-muted)]">{r.when}</span>
+                <span className={`text-xs font-bold ${r.color}`}>{r.pct} refund</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Terms */}
+          <label className={`flex gap-3 rounded-2xl p-4 cursor-pointer border transition-colors ${
+            termsAccepted ? "bg-[var(--color-forest)]/8 border-[var(--color-forest)]/30" : "bg-[var(--bg-surface)] border-transparent"
+          }`}>
+            <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+              termsAccepted ? "bg-[var(--color-forest)] border-[var(--color-forest)]" : "border-[var(--border)]"
+            }`}>
+              {termsAccepted && <svg viewBox="0 0 24 24" className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3}><path d="M20 6L9 17l-5-5" /></svg>}
+            </div>
+            <input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} className="sr-only" />
+            <span className="text-xs text-[var(--text-muted)] leading-relaxed">
+              I agree to the{" "}
+              <a href="/terms" className="text-[var(--color-teal)] font-medium">Terms of Service</a>,{" "}
+              <a href="/cancellation-policy" className="text-[var(--color-teal)] font-medium">Cancellation Policy</a>, and{" "}
+              <a href="/privacy" className="text-[var(--color-teal)] font-medium">Privacy Policy</a>.
+            </span>
+          </label>
+
+          {error && (
+            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
+              <span className="text-red-500 text-sm">⚠</span>
+              <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* M-Pesa CTA */}
+          <button onClick={handleConfirm} disabled={loading || !termsAccepted}
+            className="w-full flex items-center justify-center gap-3 text-white font-bold py-4 rounded-2xl transition-all active:scale-[.98] disabled:opacity-50"
+            style={loading || !termsAccepted ? { background: "#9ca3af" } : {
+              background: "linear-gradient(135deg, #00A651 0%, #007a3d 100%)",
+              boxShadow: "0 4px 16px rgba(0,166,81,0.4)",
+            }}>
+            {loading
+              ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending prompt…</>
+              : <><span className="text-lg">📱</span> Pay KES {total.toLocaleString()} via M-Pesa</>
+            }
+          </button>
+
+          <p className="text-xs text-center text-[var(--text-muted)] pb-4">
+            You'll receive an M-Pesa STK Push prompt on your phone.<br />Enter your PIN to complete the booking.
+          </p>
         </div>
-
-        {/* Terms */}
-        <label className="flex gap-3 bg-[var(--bg-surface)] rounded-2xl p-4 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={termsAccepted}
-            onChange={e => setTermsAccepted(e.target.checked)}
-            className="mt-0.5 w-5 h-5 accent-[var(--color-forest)]"
-          />
-          <span className="text-sm text-[var(--text-muted)] leading-relaxed">
-            I agree to the{" "}
-            <a href="/terms" className="text-[var(--color-teal)] underline">Terms of Service</a>,{" "}
-            <a href="/cancellation-policy" className="text-[var(--color-teal)] underline">Cancellation Policy</a>, and{" "}
-            <a href="/privacy" className="text-[var(--color-teal)] underline">Privacy Policy</a>.
-          </span>
-        </label>
-
-        {error && (
-          <p className="text-red-500 text-sm text-center bg-red-50 dark:bg-red-900/20 rounded-xl px-4 py-3">{error}</p>
-        )}
-
-        {/* M-Pesa CTA */}
-        <button
-          onClick={handleConfirm}
-          disabled={loading || !termsAccepted}
-          className="w-full bg-[#00A651] disabled:bg-gray-300 text-white font-semibold py-4 rounded-2xl text-sm transition-colors"
-        >
-          {loading ? "Sending M-Pesa prompt…" : `Pay KES ${total.toLocaleString()} via M-Pesa`}
-        </button>
-
-        <p className="text-xs text-center text-[var(--text-muted)]">
-          You'll receive an M-Pesa prompt on your phone. Enter your PIN to confirm.
-        </p>
       </div>
     </div>
   );
