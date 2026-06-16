@@ -1,26 +1,104 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-KE">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0D3D20" />
-    <meta name="description" content="Discover and book vacation rentals in Naivasha, Kenya." />
-    <meta property="og:title" content="StayNaivasha — Vacation Rentals in Naivasha, Kenya" />
-    <meta property="og:description" content="Discover and book vacation rentals in Naivasha, Kenya." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://staynaivasha.com" />
-    <meta property="og:image" content="/icons/icon-512.png" />
+    <meta name="theme-color" content="#1e4a22" />
+
+    <!-- Primary SEO -->
+    <title>StayNaivasha — Holiday Homes, Cottages & Villas in Naivasha, Kenya</title>
+    <meta name="description" content="Book holiday homes, cottages, villas and campsites in Naivasha, Kenya. Secure M-Pesa payments, verified listings, instant confirmation. Discover Lake Naivasha, Hell's Gate & more." />
+    <meta name="keywords" content="Naivasha accommodation, holiday homes Naivasha, cottages Naivasha Kenya, Naivasha vacation rentals, Lake Naivasha hotels, Hell's Gate accommodation, Naivasha villas, book Naivasha, Kenya holiday homes" />
+    <meta name="author" content="StayNaivasha" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <link rel="canonical" href="https://staynaivasha.co.ke/" />
+
+    <!-- Geo targeting — tells Google this is a Kenyan site -->
+    <meta name="geo.region" content="KE-31" />
+    <meta name="geo.placename" content="Naivasha, Kenya" />
+    <meta name="geo.position" content="-0.7127;36.4310" />
+    <meta name="ICBM" content="-0.7127, 36.4310" />
+
+    <!-- Open Graph — Facebook, WhatsApp, LinkedIn previews -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="StayNaivasha" />
+    <meta property="og:title"       content="StayNaivasha — Holiday Homes & Cottages in Naivasha, Kenya" />
+    <meta property="og:description" content="Book holiday homes, cottages, villas and campsites in Naivasha, Kenya. Secure M-Pesa payments. Verified listings." />
+    <meta property="og:image"       content="https://staynaivasha.co.ke/logo.png" />
+    <meta property="og:image:width"  content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:url"         content="https://staynaivasha.co.ke/" />
+    <meta property="og:locale"      content="en_KE" />
+
+    <!-- Twitter / X card -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:site"        content="@staynaivasha" />
+    <meta name="twitter:title"       content="StayNaivasha — Holiday Homes & Cottages in Naivasha" />
+    <meta name="twitter:description" content="Book verified holiday homes in Naivasha, Kenya. Secure M-Pesa payments." />
+    <meta name="twitter:image"       content="https://staynaivasha.co.ke/logo.png" />
+
+    <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="StayNaivasha" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,700;1,300&family=Inter:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <title>StayNaivasha — Vacation Rentals in Naivasha, Kenya</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,700;1,300&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+
+    <!-- JSON-LD: Website + SearchAction — makes Google show a search box in results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://staynaivasha.co.ke/#website",
+          "name": "StayNaivasha",
+          "url": "https://staynaivasha.co.ke",
+          "description": "Book holiday homes, cottages, villas and campsites in Naivasha, Kenya.",
+          "inLanguage": "en-KE",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://staynaivasha.co.ke/search?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://staynaivasha.co.ke/#organization",
+          "name": "StayNaivasha",
+          "url": "https://staynaivasha.co.ke",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://staynaivasha.co.ke/logo.png"
+          },
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "availableLanguage": ["English", "Swahili"],
+            "areaServed": "KE"
+          },
+          "areaServed": {
+            "@type": "City",
+            "name": "Naivasha",
+            "containedInPlace": {
+              "@type": "Country",
+              "name": "Kenya"
+            }
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <noscript>You need JavaScript enabled to use StayNaivasha.</noscript>

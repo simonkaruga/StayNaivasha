@@ -17,9 +17,16 @@ class Settings(BaseSettings):
     MPESA_CALLBACK_URL: str = "https://staynaivasha.co.ke/api/payments/mpesa/callback"
     MPESA_SECURITY_CREDENTIAL: str = ""  # RSA-encrypted initiator password from Safaricom portal
 
-    # Africa's Talking SMS + OTP
+    # Africa's Talking SMS + WhatsApp + OTP
     AT_API_KEY: str = ""
     AT_USERNAME: str = "sandbox"
+    AT_WHATSAPP_NUMBER: str = ""   # Your registered AT WhatsApp channel number e.g. +254700000000
+
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    FRONTEND_URL: str = "http://localhost:5173"   # override in prod: https://staynaivasha.co.ke
+    BACKEND_URL: str = "http://localhost:8000"    # override in prod: https://staynaivasha.co.ke
 
     # Third-party services
     CLAUDE_API_KEY: str = ""

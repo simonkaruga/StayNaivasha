@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { CheckCircle2, Clock, XCircle } from "lucide-react";
 import { useSEO } from "../utils/seo";
 
 const PROPERTY_TYPES = ["Cottage", "Villa", "House", "Apartment", "Conference / Retreat", "Campsite"];
@@ -50,8 +51,10 @@ export default function OwnerApply() {
   }
 
   if (step === "submitted") return (
-    <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col items-center justify-center px-6 text-center pt-14">
-      <div className="w-16 h-16 rounded-full bg-[var(--color-forest)]/10 flex items-center justify-center text-3xl mb-4">✅</div>
+    <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col items-center justify-center px-6 text-center pt-20">
+      <div className="w-16 h-16 rounded-full bg-[var(--color-forest)]/10 flex items-center justify-center mb-4">
+        <CheckCircle2 size={32} className="text-[var(--color-forest)]" />
+      </div>
       <h1 className="font-display italic text-2xl text-[var(--text-primary)] mb-2">Application received!</h1>
       <p className="text-[var(--text-muted)] text-sm max-w-xs mb-6">
         We'll review your application within <strong>24–48 hours</strong> and contact you on <strong>{form.phone}</strong> once approved.
@@ -60,7 +63,7 @@ export default function OwnerApply() {
         <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide font-semibold mb-2">What happens next</p>
         {["Our team verifies your ID and property details", "You receive an SMS once approved", "Log in and start listing your property"].map((s, i) => (
           <div key={i} className="flex items-start gap-3">
-            <span className="w-5 h-5 rounded-full bg-[var(--color-forest)] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+            <span className="w-5 h-5 rounded-full bg-[var(--color-forest)] text-white text-[13px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
             <p className="text-sm text-[var(--text-primary)]">{s}</p>
           </div>
         ))}
@@ -70,15 +73,15 @@ export default function OwnerApply() {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pt-14 pb-10">
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-20 pb-10">
 
       {/* Hero banner */}
       <div className="relative overflow-hidden px-5 pt-8 pb-10 text-center"
         style={{ background: "linear-gradient(155deg, #0d2e10 0%, #1a4a1e 40%, #5c3010 75%, #2e1506 100%)" }}>
         <div className="absolute -top-8 -right-8 w-44 h-44 rounded-full" style={{ background: "rgba(62,200,144,0.07)" }} />
-        <p className="text-[var(--color-mint)] text-[10px] font-semibold tracking-[0.3em] uppercase mb-3">For property owners</p>
+        <p className="text-[var(--color-mint)] text-[13px] font-semibold tracking-[0.3em] uppercase mb-3">For property owners</p>
         <h1 className="font-display italic text-white text-3xl leading-tight mb-2">List your home.<br />Earn via M-Pesa.</h1>
-        <p className="text-white/50 text-sm">Zero commission for your first 3 months.</p>
+        <p className="text-white/50 text-sm">Zero commission for your first 2 months.</p>
       </div>
 
       <div className="px-4 pt-6 max-w-lg mx-auto space-y-5">
@@ -102,9 +105,9 @@ export default function OwnerApply() {
               "bg-yellow-50 text-yellow-700"
             }`}>
               {appStatus.status === "none" && "No application found for this number."}
-              {appStatus.status === "pending" && "⏳ Your application is under review. We'll SMS you when it's done."}
-              {appStatus.status === "approved" && "✅ Approved! Log in with your phone number to access the owner dashboard."}
-              {appStatus.status === "rejected" && `❌ Not approved. ${appStatus.rejection_reason ? `Reason: ${appStatus.rejection_reason}` : "Contact support for more info."}`}
+              {appStatus.status === "pending" && <span className="flex items-center gap-2"><Clock size={14} /> Your application is under review. We'll SMS you when it's done.</span>}
+              {appStatus.status === "approved" && <span className="flex items-center gap-2"><CheckCircle2 size={14} /> Approved! Log in with your phone number to access the owner dashboard.</span>}
+              {appStatus.status === "rejected" && <span className="flex items-center gap-2"><XCircle size={14} /> Not approved. {appStatus.rejection_reason ? `Reason: ${appStatus.rejection_reason}` : "Contact support for more info."}</span>}
             </div>
           )}
         </div>
@@ -138,7 +141,7 @@ export default function OwnerApply() {
               <label className="text-xs text-[var(--text-muted)] font-medium">National ID / Passport number *</label>
               <input value={form.national_id} onChange={e => set("national_id", e.target.value)}
                 placeholder="e.g. 12345678" className={inputCls} />
-              <p className="text-[10px] text-[var(--text-muted)]">Used for identity verification only. Not shared publicly.</p>
+              <p className="text-[13px] text-[var(--text-muted)]">Used for identity verification only. Not shared publicly.</p>
             </div>
           </div>
 

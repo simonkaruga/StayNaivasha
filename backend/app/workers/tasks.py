@@ -36,22 +36,42 @@ async def _send_booking_notifications_async(booking_id: str) -> None:
         owner = (await db.execute(select(User).where(User.id == prop.owner_id))).scalar_one_or_none() if prop else None
 
         if guest and prop:
-            await _send_sms(
-                guest.phone,
+            sms = (
                 f"Booking confirmed! {prop.title}. "
                 f"Check-in: {booking.check_in}. Code: {booking.checkin_code}. "
                 f"Ref: {booking.mpesa_ref}"
             )
+            wa = (
+                f"✅ *Booking Confirmed!*\n\n"
+                f"🏡 *{prop.title}*\n"
+                f"📅 Check-in:  {booking.check_in}\n"
+                f"📅 Check-out: {booking.check_out}\n"
+                f"💰 Paid: KES {booking.total_amount:,}\n\n"
+                f"🔐 *Check-in Code: {booking.checkin_code}*\n"
+                f"Show this to the owner on arrival.\n\n"
+                f"Your money is held safely in escrow until you check in.\n"
+                f"— StayNaivasha 🌿"
+            )
+            await _notify(guest.phone, sms, wa)
 
         if owner and prop:
             nights = (booking.check_out - booking.check_in).days
             payout = booking.total_amount - booking.platform_fee
-            await _send_sms(
-                owner.phone,
+            sms = (
                 f"New booking! {prop.title}. "
                 f"{booking.check_in} to {booking.check_out} ({nights} nights). "
                 f"KES {payout:,} payout after check-in."
             )
+            wa = (
+                f"🎉 *New Booking!*\n\n"
+                f"🏡 *{prop.title}*\n"
+                f"📅 {booking.check_in} → {booking.check_out} ({nights} night{'s' if nights != 1 else ''})\n"
+                f"💵 Your payout: *KES {payout:,}*\n\n"
+                f"Released via M-Pesa after the guest checks in.\n"
+                f"Log in to your dashboard to manage this booking.\n"
+                f"— StayNaivasha Host 🌿"
+            )
+            await _notify(owner.phone, sms, wa)
 
 
 # ── M-Pesa B2C payout ────────────────────────────────────────────────────────
@@ -129,6 +149,24 @@ async def _release_payout_async(booking_id: str) -> None:
             status="pending",
         )
         db.add(payout)
+
+        # Agent commission — update referral row and agent lifetime earnings
+        from app.models.models import AgentReferral, Agent
+        referral = (await db.execute(
+            select(AgentReferral).where(AgentReferral.booking_id == booking_id)
+        )).scalar_one_or_none()
+        if referral:
+            agent = (await db.execute(
+                select(Agent).where(Agent.id == referral.agent_id)
+            )).scalar_one_or_none()
+            if agent:
+                commission = int(booking.total_amount * agent.commission_pct / 100)
+                from datetime import datetime, timezone as _tz
+                referral.commission_kes = commission
+                referral.status = "paid"
+                referral.paid_at = datetime.now(_tz.utc)
+                agent.total_earned = (agent.total_earned or 0) + commission
+
         await db.commit()
 
         await log_event(db, "escrow_released", booking_id, None,
@@ -194,47 +232,88 @@ async def _send_push_async(user_id: str, title: str, body: str) -> None:
 
 @celery.task
 def sync_all_icals() -> None:
-    """Poll all owner iCal import URLs every 2 hours."""
+    """Poll all external calendars every 30 min to prevent cross-platform double-booking."""
     asyncio.run(_sync_icals_async())
 
 
 async def _sync_icals_async() -> None:
     from sqlalchemy import select
+    from datetime import date, datetime, timezone
     from app.core.database import AsyncSessionLocal
-    from app.models.models import Property, Availability
+    from app.models.models import ExternalCalendar, Property, Availability, Booking, User
     from app.services.ical import parse_remote_ical
-    from datetime import date
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(Property).where(Property.ical_import_url.isnot(None), Property.active == True)
+        # Fetch all external calendar URLs across all active properties
+        cals_result = await db.execute(
+            select(ExternalCalendar).join(Property, Property.id == ExternalCalendar.property_id)
+            .where(Property.active == True)
         )
-        properties = result.scalars().all()
+        calendars = cals_result.scalars().all()
 
-        for prop in properties:
+        for cal in calendars:
             try:
-                blocked_ranges = await parse_remote_ical(prop.ical_import_url)
+                blocked_ranges = await parse_remote_ical(cal.ical_url)
+                newly_blocked: list[date] = []
+
                 for start, end in blocked_ranges:
                     current = start
                     while current < end:
-                        # Upsert — skip if already blocked
-                        existing = await db.execute(
+                        existing = (await db.execute(
                             select(Availability).where(
-                                Availability.property_id == prop.id,
+                                Availability.property_id == cal.property_id,
                                 Availability.date == current,
                             )
-                        )
-                        if not existing.scalar_one_or_none():
+                        )).scalar_one_or_none()
+
+                        if not existing:
                             db.add(Availability(
-                                property_id=prop.id,
+                                property_id=cal.property_id,
                                 date=current,
                                 is_blocked=True,
                                 source="ical",
                             ))
+                            newly_blocked.append(current)
                         current = date.fromordinal(current.toordinal() + 1)
+
+                # Conflict detection: check if any newly blocked date overlaps a confirmed booking
+                if newly_blocked:
+                    min_date = min(newly_blocked)
+                    max_date = max(newly_blocked)
+                    conflict_bookings = (await db.execute(
+                        select(Booking).where(
+                            Booking.property_id == cal.property_id,
+                            Booking.status.in_(["confirmed", "pending"]),
+                            Booking.check_in <= max_date,
+                            Booking.check_out > min_date,
+                        )
+                    )).scalars().all()
+
+                    for booking in conflict_bookings:
+                        # Alert the property owner via WhatsApp + SMS
+                        prop = (await db.execute(
+                            select(Property).where(Property.id == cal.property_id)
+                        )).scalar_one_or_none()
+                        if prop:
+                            owner = (await db.execute(
+                                select(User).where(User.id == prop.owner_id)
+                            )).scalar_one_or_none()
+                            if owner:
+                                msg = (
+                                    f"⚠️ *Double-booking alert — {prop.title}*\n\n"
+                                    f"A guest just booked *{cal.platform.title()}* for dates "
+                                    f"{booking.check_in} → {booking.check_out}, "
+                                    f"which overlap with booking #{booking.id[:8].upper()} on StayNaivasha.\n\n"
+                                    f"Please cancel one booking immediately and contact StayNaivasha support: "
+                                    f"support@staynaivasha.co.ke"
+                                )
+                                await _notify(owner.phone, msg)
+
+                cal.last_synced_at = datetime.now(timezone.utc)
                 await db.commit()
+
             except Exception as e:
-                print(f"[iCal sync] Failed for property {prop.id}: {e}")
+                print(f"[iCal sync] Failed for calendar {cal.id} ({cal.platform}): {e}")
 
 
 # ── Refund processing ────────────────────────────────────────────────────────
@@ -338,12 +417,20 @@ async def _send_reminders_async() -> None:
             prop = (await db.execute(select(Property).where(Property.id == booking.property_id))).scalar_one_or_none()
             guest = (await db.execute(select(User).where(User.id == booking.guest_id))).scalar_one_or_none()
             if guest and prop:
-                await _send_sms(
-                    guest.phone,
+                sms = (
                     f"Reminder: Check-in tomorrow at {prop.title}. "
                     f"Code: {booking.checkin_code}. "
                     f"{prop.landmark_instructions or 'See booking confirmation for directions.'}"
                 )
+                wa = (
+                    f"⏰ *Check-in Reminder*\n\n"
+                    f"You check in *tomorrow* at:\n"
+                    f"🏡 *{prop.title}*\n\n"
+                    f"🔐 Your check-in code: *{booking.checkin_code}*\n\n"
+                    + (f"📍 Directions: {prop.landmark_instructions}\n\n" if prop.landmark_instructions else "")
+                    + f"See you in Naivasha! 🌿\n— StayNaivasha"
+                )
+                await _notify(guest.phone, sms, wa)
 
 
 # ── Shared SMS helper ─────────────────────────────────────────────────────────
@@ -363,3 +450,40 @@ async def _send_sms(phone: str, message: str) -> None:
             headers={"apiKey": settings.AT_API_KEY, "Accept": "application/json"},
             timeout=10,
         )
+
+
+# ── WhatsApp helper (Africa's Talking WhatsApp API) ───────────────────────────
+
+async def _send_whatsapp(phone: str, message: str) -> None:
+    """Send a WhatsApp message via Africa's Talking.
+    Falls back silently if AT_WHATSAPP_NUMBER is not configured.
+    """
+    import httpx
+    from app.core.config import settings
+
+    if not settings.AT_API_KEY or not settings.AT_WHATSAPP_NUMBER:
+        print(f"[DEV WHATSAPP] {phone}: {message}")
+        return
+
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            "https://chat.africastalking.com/whatsapp/message",
+            json={
+                "username":      settings.AT_USERNAME,
+                "channelNumber": settings.AT_WHATSAPP_NUMBER,
+                "to":            phone,
+                "message":       message,
+            },
+            headers={"apiKey": settings.AT_API_KEY, "Content-Type": "application/json"},
+            timeout=10,
+        )
+
+
+async def _notify(phone: str, sms_text: str, wa_text: str | None = None) -> None:
+    """Send SMS + WhatsApp in parallel. wa_text defaults to sms_text if omitted."""
+    import asyncio as _asyncio
+    await _asyncio.gather(
+        _send_sms(phone, sms_text),
+        _send_whatsapp(phone, wa_text or sms_text),
+        return_exceptions=True,
+    )

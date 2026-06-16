@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { generateBookingPDF } from "../utils/pdf";
+import { generateBookingPDF, generateCorporateInvoicePDF } from "../utils/pdf";
 import { imgSrc } from "../utils/image";
 
 type Stage = "pending" | "confirmed" | "cancelled" | "timeout";
@@ -8,8 +8,10 @@ type Stage = "pending" | "confirmed" | "cancelled" | "timeout";
 interface BookingDetail {
   id: string; property_id: string;
   check_in: string; check_out: string;
-  total_amount: number; checkin_code: string;
-  mpesa_ref: string | null; status: string;
+  total_amount: number; platform_fee: number;
+  checkin_code: string; mpesa_ref: string | null; status: string;
+  is_corporate?: boolean; company_name?: string | null;
+  kra_pin?: string | null; group_name?: string | null;
 }
 
 interface NavState {
@@ -125,7 +127,7 @@ export default function BookingConfirm() {
 
           {/* Check-in code */}
           <div className="bg-[var(--bg-surface)] rounded-3xl p-5 text-center border border-[var(--border)]">
-            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-[0.22em] font-semibold mb-3">
+            <p className="text-[13px] text-[var(--text-muted)] uppercase tracking-[0.22em] font-semibold mb-3">
               Check-in code — show to owner
             </p>
             <div className="flex items-center justify-center gap-2">
@@ -141,14 +143,14 @@ export default function BookingConfirm() {
           <div className="bg-[var(--bg-surface)] rounded-2xl p-4 border border-[var(--border)]">
             <div className="flex items-center justify-between mb-3">
               <div className="text-center flex-1">
-                <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide font-semibold mb-1">Check-in</p>
+                <p className="text-[12px] text-[var(--text-muted)] uppercase tracking-wide font-semibold mb-1">Check-in</p>
                 <p className="font-bold text-[var(--text-primary)] text-sm">{fmtDate(booking.check_in)}</p>
               </div>
               <div className="px-4 text-center">
                 <p className="text-xs font-semibold text-[var(--color-amber)]">{Math.round(nights)} nights</p>
               </div>
               <div className="text-center flex-1">
-                <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide font-semibold mb-1">Check-out</p>
+                <p className="text-[12px] text-[var(--text-muted)] uppercase tracking-wide font-semibold mb-1">Check-out</p>
                 <p className="font-bold text-[var(--text-primary)] text-sm">{fmtDate(booking.check_out)}</p>
               </div>
             </div>
@@ -170,6 +172,18 @@ export default function BookingConfirm() {
             </svg>
             Download PDF confirmation
           </button>
+
+          {booking.is_corporate && (
+            <button
+              onClick={() => generateCorporateInvoicePDF(booking, nav.propertyTitle ?? "Accommodation")}
+              className="w-full flex items-center justify-center gap-2 font-bold py-4 rounded-2xl active:scale-[.98] border-2 border-[var(--color-teal)] text-[var(--color-teal)]">
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+              </svg>
+              Download tax invoice (KRA)
+            </button>
+          )}
 
           <button
             onClick={() =>
@@ -309,7 +323,7 @@ export default function BookingConfirm() {
 
         {/* Countdown */}
         <div className="bg-[var(--bg-surface)] rounded-2xl px-8 py-4 mb-8 border border-[var(--border)]">
-          <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-[0.18em] font-semibold mb-1">
+          <p className="text-[12px] text-[var(--text-muted)] uppercase tracking-[0.18em] font-semibold mb-1">
             Session expires in
           </p>
           <p className="font-mono font-bold text-3xl text-[var(--text-primary)]">{mins}:{ss}</p>

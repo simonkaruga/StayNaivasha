@@ -57,7 +57,7 @@ const AMENITY_MAP: Amenity[] = [
   { keys: ["kitchen","cooking","chef"],                   icon: <UtensilsCrossed className="w-6 h-6 text-amber-600" />, label: "Kitchen" },
   { keys: ["parking","garage"],                           icon: <Car className="w-6 h-6 text-slate-500" />,          label: "Parking" },
   { keys: ["lake","waterfront","water view","shore"],     icon: <Sailboat className="w-6 h-6 text-cyan-500" />,     label: "Lake view" },
-  { keys: ["flamingo","zebra","wildlife","bird","animal"],icon: <Bird className="w-6 h-6 text-pink-500" />,         label: "Wildlife" },
+  { keys: ["hippo","zebra","wildlife","bird","animal","fish eagle"],icon: <Bird className="w-6 h-6 text-pink-500" />,  label: "Wildlife" },
   { keys: ["projector","conference","whiteboard"],        icon: <Monitor className="w-6 h-6 text-slate-500" />,     label: "AV equipment" },
   { keys: ["zip","archery","cycling","team build"],       icon: <Zap className="w-6 h-6 text-yellow-500" />,        label: "Activities" },
   { keys: ["mountain","longonot","rift valley","volcano"],icon: <Mountain className="w-6 h-6 text-slate-600" />,   label: "Scenic view" },
@@ -194,7 +194,7 @@ function AvailabilityCalendar({ propertyId, checkIn, checkOut, onCheckIn, onChec
         </div>
         <div className="grid grid-cols-7 gap-0.5 text-center">
           {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
-            <div key={d} className="text-[10px] font-semibold text-[var(--text-muted)] py-1">{d}</div>
+            <div key={d} className="text-[13px] font-semibold text-[var(--text-muted)] py-1">{d}</div>
           ))}
           {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
           {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -210,7 +210,7 @@ function AvailabilityCalendar({ propertyId, checkIn, checkOut, onCheckIn, onChec
             );
           })}
         </div>
-        <div className="flex gap-4 text-[10px] text-[var(--text-muted)]">
+        <div className="flex gap-4 text-[13px] text-[var(--text-muted)]">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--color-forest)] inline-block" />Selected</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--border)] inline-block" />Unavailable</span>
         </div>
@@ -276,7 +276,7 @@ function ChatBot({ propertyId, propertyTitle }: { propertyId: string; propertyTi
             <div className="w-8 h-8 rounded-full bg-[var(--color-mint)] flex items-center justify-center text-[var(--color-forest)] text-sm font-bold">AI</div>
             <div>
               <p className="text-white text-sm font-semibold">Ask about this home</p>
-              <p className="text-white/60 text-[10px]">{propertyTitle}</p>
+              <p className="text-white/60 text-[13px]">{propertyTitle}</p>
             </div>
           </div>
 
@@ -357,6 +357,7 @@ export default function Property() {
   const [showAllAmen,  setShowAllAmen]  = useState(false);
   const [copyToast,    setCopyToast]    = useState(false);
   const touchStartX    = useRef(0);
+  const calendarRef    = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 260);
@@ -390,15 +391,38 @@ export default function Property() {
   // SEO — must be called unconditionally before any early returns
   const primaryImg = prop?.images?.find(i => i.is_primary)?.cloudinary_url ?? prop?.images?.[0]?.cloudinary_url;
   useSEO({
-    title: prop ? prop.title : "Property",
+    title: prop ? `${prop.title} — Naivasha` : "Property",
     description: prop?.description
       ? `${prop.description.slice(0, 140)}… Book via M-Pesa from KES ${prop.price_per_night.toLocaleString()}/night.`
       : prop
         ? `${prop.type.charAt(0).toUpperCase() + prop.type.slice(1)} in Naivasha from KES ${prop.price_per_night.toLocaleString()}/night.`
         : undefined,
     image: primaryImg,
-    url: prop ? `https://staynaivasha.co.ke/property/${prop.id}` : undefined,
+    url: prop ? `/property/${prop.id}` : undefined,
     type: "article",
+    jsonLd: prop ? {
+      "@context": "https://schema.org",
+      "@type": "LodgingBusiness",
+      "name": prop.title,
+      "description": prop.description ?? `${prop.type} in Naivasha, Kenya`,
+      "image": prop.images.map(i => i.cloudinary_url),
+      "url": `https://staynaivasha.co.ke/property/${prop.id}`,
+      "priceRange": `KES ${prop.price_per_night.toLocaleString()}/night`,
+      "currenciesAccepted": "KES",
+      "paymentAccepted": "M-Pesa",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Naivasha",
+        "addressRegion": "Nakuru County",
+        "addressCountry": "KE",
+      },
+      ...(prop.lat && prop.lng ? {
+        "geo": { "@type": "GeoCoordinates", "latitude": prop.lat, "longitude": prop.lng },
+        "hasMap": `https://www.google.com/maps?q=${prop.lat},${prop.lng}`,
+      } : {}),
+      "amenityFeature": [],
+      "starRating": prop.verified_tier >= 2 ? { "@type": "Rating", "ratingValue": "4" } : undefined,
+    } : undefined,
   });
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -421,6 +445,10 @@ export default function Property() {
       <button onClick={() => navigate(-1)} className="text-[var(--color-teal)] text-sm underline">Go back</button>
     </div>
   );
+
+  function fmtDate(d: string) {
+    return new Date(d).toLocaleDateString("en-KE", { day: "numeric", month: "short" });
+  }
 
   const imgs         = [...prop.images].sort((a, b) => a.display_order - b.display_order);
   const nights       = checkIn && checkOut ? Math.max(0, (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000) : 0;
@@ -510,7 +538,7 @@ export default function Property() {
         {imgs.length > 0
           ? <img src={imgSrc(imgs[photoIndex]?.cloudinary_url, 800)} alt={prop.title} className="w-full h-full object-cover" />
           : <div className="w-full h-full bg-gradient-to-br from-[var(--color-forest)] to-[var(--color-teal)] flex items-center justify-center">
-              <span className="text-white/40 text-4xl">🏡</span>
+              <HomeIcon size={48} className="text-white/40" />
             </div>
         }
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/20" />
@@ -627,7 +655,7 @@ export default function Property() {
                 Verified owner{prop.host_since ? ` · Since ${new Date(prop.host_since).getFullYear()}` : ""}
               </span>
               {prop.host_id_verified && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-0.5 text-[13px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
                   <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5}>
                     <path d="M9 12l2 2 4-4" />
                     <path d="M12 2a10 10 0 100 20A10 10 0 0012 2z" />
@@ -666,7 +694,7 @@ export default function Property() {
             {(showAllAmen ? amenities : amenities.slice(0, 6)).map(a => (
               <div key={a.label} className="flex flex-col items-center gap-1.5 bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl px-2 py-3 text-center">
                 <span className="flex items-center justify-center">{a.icon}</span>
-                <span className="text-[10px] font-medium text-[var(--text-primary)] leading-tight">{a.label}</span>
+                <span className="text-[13px] font-medium text-[var(--text-primary)] leading-tight">{a.label}</span>
               </div>
             ))}
           </div>
@@ -741,14 +769,16 @@ export default function Property() {
         </div>
 
         {/* ── Availability calendar ── */}
-        <AvailabilityCalendar
-          propertyId={prop.id}
-          checkIn={checkIn}
-          checkOut={checkOut}
-          onCheckIn={setCheckIn}
-          onCheckOut={setCheckOut}
-          minNights={prop.min_nights}
-        />
+        <div ref={calendarRef}>
+          <AvailabilityCalendar
+            propertyId={prop.id}
+            checkIn={checkIn}
+            checkOut={checkOut}
+            onCheckIn={setCheckIn}
+            onCheckOut={setCheckOut}
+            minNights={prop.min_nights}
+          />
+        </div>
 
         {/* ── Reviews ── */}
         {reviews.length > 0 && (
@@ -791,7 +821,7 @@ export default function Property() {
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-[var(--text-primary)]">{guestName}</p>
-                          <p className="text-[10px] text-[var(--text-muted)]">
+                          <p className="text-[13px] text-[var(--text-muted)]">
                             {new Date(r.created_at).toLocaleDateString("en-KE", { month: "long", year: "numeric" })}
                           </p>
                         </div>
@@ -804,7 +834,7 @@ export default function Property() {
                       {r.comment && <p className="text-sm text-[var(--text-primary)] leading-relaxed">{r.comment}</p>}
                       {r.owner_response && (
                         <div className="bg-[var(--bg-primary)] rounded-xl px-3 py-2 space-y-0.5">
-                          <p className="text-[10px] font-semibold text-[var(--color-teal)]">Owner response</p>
+                          <p className="text-[13px] font-semibold text-[var(--color-teal)]">Owner response</p>
                           <p className="text-xs text-[var(--text-muted)] leading-relaxed">{r.owner_response}</p>
                         </div>
                       )}
@@ -865,25 +895,31 @@ export default function Property() {
           </div>
           {nights > 0 && (
             <div className="text-right">
-              <p className="text-[10px] text-[var(--text-muted)]">{nights} night{nights > 1 ? "s" : ""} · incl. fees</p>
+              <p className="text-[13px] text-[var(--text-muted)]">{nights} night{nights > 1 ? "s" : ""} · incl. fees</p>
               <p className="text-base font-bold text-[var(--text-primary)]">KES {total.toLocaleString()}</p>
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-2">
-          <div className="bg-[var(--bg-primary)] border-2 border-[var(--border)] focus-within:border-[var(--color-teal)] rounded-xl px-3 py-2 space-y-0.5 transition-colors">
-            <p className="text-[9px] text-[var(--text-muted)] font-bold uppercase tracking-wide">Check-in</p>
-            <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
-              className="w-full bg-transparent text-[var(--text-primary)] text-xs outline-none font-semibold" />
-          </div>
-          <div className="bg-[var(--bg-primary)] border-2 border-[var(--border)] focus-within:border-[var(--color-teal)] rounded-xl px-3 py-2 space-y-0.5 transition-colors">
-            <p className="text-[9px] text-[var(--text-muted)] font-bold uppercase tracking-wide">Check-out</p>
-            <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)}
-              min={checkIn || new Date().toISOString().split("T")[0]}
-              className="w-full bg-transparent text-[var(--text-primary)] text-xs outline-none font-semibold" />
-          </div>
+          <button
+            onClick={() => calendarRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            className={`text-left bg-[var(--bg-primary)] border-2 rounded-xl px-3 py-2 transition-colors active:scale-[.98] ${checkIn ? "border-[var(--color-forest)]" : "border-[var(--border)]"}`}
+          >
+            <p className="text-[12px] text-[var(--text-muted)] font-bold uppercase tracking-wide">Check-in</p>
+            <p className={`text-xs font-semibold mt-0.5 ${checkIn ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
+              {checkIn ? fmtDate(checkIn) : "Add date"}
+            </p>
+          </button>
+          <button
+            onClick={() => calendarRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            className={`text-left bg-[var(--bg-primary)] border-2 rounded-xl px-3 py-2 transition-colors active:scale-[.98] ${checkOut ? "border-[var(--color-forest)]" : "border-[var(--border)]"}`}
+          >
+            <p className="text-[12px] text-[var(--text-muted)] font-bold uppercase tracking-wide">Check-out</p>
+            <p className={`text-xs font-semibold mt-0.5 ${checkOut ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
+              {checkOut ? fmtDate(checkOut) : "Add date"}
+            </p>
+          </button>
         </div>
 
         {/* Guests row */}
@@ -895,7 +931,7 @@ export default function Property() {
             <span className="text-sm font-bold text-[var(--text-primary)] w-4 text-center">{guests}</span>
             <button type="button" onClick={() => setGuests(g => Math.min(prop.max_guests ?? 20, g + 1))}
               className="w-6 h-6 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] font-bold text-sm">+</button>
-            {prop.max_guests && <span className="text-[10px] text-[var(--text-muted)]">max {prop.max_guests}</span>}
+            {prop.max_guests && <span className="text-[13px] text-[var(--text-muted)]">max {prop.max_guests}</span>}
           </div>
         </div>
 

@@ -6,9 +6,9 @@ from app.core.config import settings
 celery = Celery("staynaivasha", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 
 celery.conf.beat_schedule = {
-    "ical-sync-every-2-hours": {
+    "ical-sync-every-10-min": {
         "task": "app.workers.tasks.sync_all_icals",
-        "schedule": crontab(minute=0, hour="*/2"),
+        "schedule": crontab(minute="*/10"),   # every 10 min — narrow external-platform window to ~10 min
     },
     "send-checkin-reminders": {
         "task": "app.workers.tasks.send_checkin_reminders",

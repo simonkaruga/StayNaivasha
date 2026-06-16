@@ -61,7 +61,7 @@ export default function Saved() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pt-14 pb-6">
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-20 pb-6">
 
       {/* Header */}
       <div className="sticky top-0 z-40 bg-[var(--bg-surface)] border-b border-[var(--border)] px-4 py-4">

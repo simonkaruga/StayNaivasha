@@ -296,3 +296,57 @@ async def update_pricing(
     prop.price_per_night = body.price_per_night
     await db.commit()
     return {"price_per_night": prop.price_per_night}
+
+
+# ── Quick date blocker (prevents cross-platform double-booking) ───────────────
+
+class BlockDates(BaseModel):
+    property_id: str
+    check_in: date_type
+    check_out: date_type
+
+
+@router.post("/block-dates", status_code=204)
+async def block_dates(
+    body: BlockDates,
+    owner: User = Depends(require_owner),
+    db: AsyncSession = Depends(get_db),
+):
+    """Owner manually blocks dates — used when they receive an Airbnb/Booking.com booking."""
+    if body.check_out <= body.check_in:
+        raise HTTPException(status_code=400, detail="Check-out must be after check-in")
+
+    prop = (await db.execute(
+        select(Property).where(Property.id == body.property_id, Property.owner_id == owner.id)
+    )).scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    from datetime import timedelta
+    from sqlalchemy import delete as sa_delete
+    # Clear existing manual blocks in this range first to avoid duplicates
+    await db.execute(
+        sa_delete(Availability).where(
+            Availability.property_id == prop.id,
+            Availability.date >= body.check_in,
+            Availability.date < body.check_out,
+            Availability.source == "manual",
+        )
+    )
+    current = body.check_in
+    while current < body.check_out:
+        existing = (await db.execute(
+            select(Availability).where(
+                Availability.property_id == prop.id,
+                Availability.date == current,
+            )
+        )).scalar_one_or_none()
+        if not existing:
+            db.add(Availability(
+                property_id=prop.id,
+                date=current,
+                is_blocked=True,
+                source="manual",
+            ))
+        current += timedelta(days=1)
+    await db.commit()

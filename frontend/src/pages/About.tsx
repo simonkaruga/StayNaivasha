@@ -1,11 +1,12 @@
 import { useNavigate, Link } from "react-router-dom";
+import { Smartphone, ShieldCheck, Home as HomeIcon, Leaf } from "lucide-react";
 import { useSEO } from "../utils/seo";
 
 export default function About() {
   const navigate = useNavigate();
   useSEO({
     title: "About StayNaivasha",
-    description: "StayNaivasha is Kenya's first local-first vacation rental platform, built by Avinaya Solutions for Kenyan guests and property owners.",
+    description: "StayNaivasha is Kenya's first local-first vacation rental platform for Kenyan guests and property owners. Book verified holiday homes in Naivasha with M-Pesa.",
   });
 
   return (
@@ -28,7 +29,7 @@ export default function About() {
         <div className="relative overflow-hidden px-5 pt-10 pb-10"
           style={{ background: "linear-gradient(160deg, #1e4a22 0%, #2a5c28 45%, #6b3a10 80%, #3d2008 100%)" }}>
           <div className="absolute -top-6 -right-6 w-40 h-40 rounded-full" style={{ background: "rgba(62,200,144,0.07)" }} />
-          <p className="text-[var(--color-mint)] text-[10px] font-semibold tracking-[0.28em] uppercase mb-3 relative z-10">
+          <p className="text-[var(--color-mint)] text-[13px] font-semibold tracking-[0.28em] uppercase mb-3 relative z-10">
             Naivasha · Kenya
           </p>
           <h2 className="font-display italic text-white relative z-10"
@@ -47,7 +48,7 @@ export default function About() {
           <section className="space-y-3">
             <h3 className="font-semibold text-[var(--text-primary)]">Our story</h3>
             <p className="text-sm text-[var(--text-muted)] leading-relaxed">
-              Naivasha has world-class views, flamingos, Hell's Gate, and some of the most beautiful
+              Naivasha has world-class views, hippos, Hell's Gate, and some of the most beautiful
               short-stay homes in East Africa. But booking them was broken — scattered WhatsApp groups,
               no photos, no price transparency, no protection if something went wrong.
             </p>
@@ -62,13 +63,16 @@ export default function About() {
             <h3 className="font-semibold text-[var(--text-primary)]">What we stand for</h3>
             <div className="space-y-3">
               {[
-                { icon: "🇰🇪", title: "Kenya first", body: "KES only. M-Pesa only. No dollar conversions, no international card fees. Built for the 50M+ Kenyans with a smartphone." },
-                { icon: "🔒", title: "Guest protection always", body: "Your money never goes to a host until you physically check in. That's a promise, not a policy." },
-                { icon: "🏡", title: "Fair for owners too", body: "Zero commission for 3 months. Flat fee after that. Payouts within 2 hours of check-in. Owners earn more here than anywhere else." },
-                { icon: "🌿", title: "Local community", body: "Every property listed supports a local Naivasha family. We don't list chains or corporate-owned properties." },
+                { Icon: Smartphone,   color: "#186878", title: "Kenya first",             body: "KES only. M-Pesa only. No dollar conversions, no international card fees. Built for the 50M+ Kenyans with a smartphone." },
+                { Icon: ShieldCheck,  color: "#1e4a22", title: "Guest protection always", body: "Your money never goes to a host until you physically check in. That's a promise, not a policy." },
+                { Icon: HomeIcon,     color: "#d4892a", title: "Fair for owners too",     body: "Zero commission for 2 months. Flat fee after that. Payouts within 2 hours of check-in. Owners earn more here than anywhere else." },
+                { Icon: Leaf,         color: "#3ec890", title: "Local community",         body: "Every property listed supports a local Naivasha family. We don't list chains or corporate-owned properties." },
               ].map(v => (
                 <div key={v.title} className="flex gap-3 bg-[var(--bg-surface)] rounded-2xl p-4 border border-[var(--border)]">
-                  <span className="text-xl flex-shrink-0">{v.icon}</span>
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${v.color}15` }}>
+                    <v.Icon size={16} style={{ color: v.color }} />
+                  </span>
                   <div>
                     <p className="font-semibold text-[var(--text-primary)] text-sm">{v.title}</p>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{v.body}</p>
@@ -88,11 +92,11 @@ export default function About() {
                 { v: "~90 min", l: "From Nairobi via A104" },
                 { v: "KES 300", l: "Flat fee per booking" },
                 { v: "2 hrs",   l: "Host payout after check-in" },
-                { v: "0%",      l: "Commission for 3 months" },
+                { v: "0%",      l: "Commission for 2 months" },
               ].map(s => (
                 <div key={s.l} className="px-4 py-3">
                   <p className="font-bold text-lg text-[var(--text-primary)] leading-none">{s.v}</p>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-1">{s.l}</p>
+                  <p className="text-[13px] text-[var(--text-muted)] mt-1">{s.l}</p>
                 </div>
               ))}
             </div>
@@ -139,9 +143,16 @@ export default function About() {
             ))}
           </div>
 
-          <p className="text-[10px] text-[var(--text-muted)] text-center pb-2">
-            © {new Date().getFullYear()} StayNaivasha · Built in Naivasha, Kenya
-          </p>
+          <div className="text-center pb-2 space-y-1">
+            <p className="text-[13px] text-[var(--text-muted)]">
+              © {new Date().getFullYear()} StayNaivasha
+            </p>
+            <p className="text-xs text-[var(--text-muted)]/70">
+              Built by{" "}
+              <span className="font-semibold text-[var(--color-forest)]">Avinaya Solutions Ltd</span>
+              {" "}· Naivasha, Kenya
+            </p>
+          </div>
         </div>
       </div>
     </div>

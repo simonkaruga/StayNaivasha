@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { BadgeCheck } from "lucide-react";
 import { toggleSaved, isSaved } from "../pages/Saved";
 import { imgSrc } from "../utils/image";
 import TypeIcon from "./TypeIcon";
@@ -128,7 +129,7 @@ export default function PropertyCard({ p }: { p: PropertyCardData }) {
 
         {/* Guest Favourite badge */}
         {isGuestFavourite && (
-          <span className="absolute top-2.5 left-2.5 bg-white text-[var(--color-nearblack)] text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+          <span className="absolute top-2.5 left-2.5 bg-white text-[var(--color-nearblack)] text-[12px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
             ❤️ Guest Favourite
           </span>
         )}
@@ -152,13 +153,13 @@ export default function PropertyCard({ p }: { p: PropertyCardData }) {
 
         {/* Type · location · trust tags */}
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] capitalize">
+          <span className="flex items-center gap-1 text-[13px] text-[var(--text-muted)] capitalize">
             <TypeIcon type={p.type} className="w-3 h-3" />
             {p.type} · Naivasha
           </span>
           <span className="flex items-center gap-1.5">
-            {p.verified_tier >= 1 && (
-              <span className="flex items-center gap-0.5 text-[10px] font-semibold text-[var(--color-teal)]">
+            {p.verified_tier === 1 && (
+              <span className="flex items-center gap-0.5 text-[13px] font-semibold text-[var(--color-teal)]">
                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <path d="M12 2l2.5 4.5L20 7.5l-4 4 1 5.5L12 14.5 7 17l1-5.5-4-4 5.5-1z"/>
                 </svg>
@@ -166,12 +167,9 @@ export default function PropertyCard({ p }: { p: PropertyCardData }) {
               </span>
             )}
             {p.verified_tier >= 2 && (
-              <span className="flex items-center gap-0.5 text-[10px] font-semibold text-[var(--color-forest)]">
-                <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                  <path d="M9 12l2 2 4-4" />
-                  <path d="M12 2a10 10 0 100 20A10 10 0 0012 2z" />
-                </svg>
-                Verified
+              <span className="flex items-center gap-0.5 text-[13px] font-bold text-white px-1.5 py-0.5 rounded-full"
+                style={{ background: "linear-gradient(135deg, #1e4a22, #186878)" }}>
+                <BadgeCheck size={10} /> Team Verified
               </span>
             )}
           </span>
@@ -190,15 +188,15 @@ export default function PropertyCard({ p }: { p: PropertyCardData }) {
                   <span className="text-amber-500 text-sm leading-none">★</span>
                   <span className="text-[13px] font-bold text-[var(--text-primary)]">{p.avg_rating.toFixed(1)}</span>
                   {p.review_count
-                    ? <span className="text-[11px] text-[var(--text-muted)]">({p.review_count})</span>
+                    ? <span className="text-[13px] text-[var(--text-muted)]">({p.review_count})</span>
                     : null}
                 </span>
-              : <span className="text-[11px] font-semibold text-[var(--color-mint)]">New</span>
+              : <span className="text-[13px] font-semibold text-[var(--color-mint)]">New</span>
             }
           </span>
           <p className="text-[13px] font-bold text-[var(--text-primary)]">
             KES {p.price_per_night.toLocaleString()}
-            <span className="text-[11px] font-normal text-[var(--text-muted)]">/night</span>
+            <span className="text-[13px] font-normal text-[var(--text-muted)]">/night</span>
           </p>
         </div>
 

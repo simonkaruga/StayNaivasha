@@ -73,49 +73,43 @@ export default function CinematicHero({ className }: { className?: string }) {
       ctx.restore();
     }
 
-    function drawFlamingo(x: number, y: number, s: number, dir: number) {
+    function drawHippo(x: number, y: number, s: number) {
       ctx.save();
       ctx.translate(x, y);
-      ctx.scale(dir, 1);
 
-      // body
-      ctx.fillStyle = "#ff9bb8";
+      // back above waterline
+      ctx.fillStyle = "#5a6a55";
       ctx.beginPath();
-      ctx.ellipse(0, 0, 9 * s, 5.5 * s, -0.25, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 18 * s, 7 * s, 0, Math.PI, 0);
       ctx.fill();
-
-      // neck
-      ctx.strokeStyle = "#ff88aa";
-      ctx.lineWidth   = 2.8 * s;
-      ctx.lineCap     = "round";
-      ctx.beginPath();
-      ctx.moveTo(-3 * s, -4 * s);
-      ctx.bezierCurveTo(-10 * s, -15 * s, 2 * s, -22 * s, 1 * s, -28 * s);
-      ctx.stroke();
 
       // head
-      ctx.fillStyle = "#ffaac5";
+      ctx.fillStyle = "#627060";
       ctx.beginPath();
-      ctx.arc(1 * s, -29 * s, 4.5 * s, 0, Math.PI * 2);
+      ctx.ellipse(-13 * s, -2 * s, 8 * s, 5.5 * s, 0.15, 0, Math.PI * 2);
       ctx.fill();
 
-      // bill
-      ctx.fillStyle = "#cc4477";
+      // nostrils
+      ctx.fillStyle = "#3d4a3a";
       ctx.beginPath();
-      ctx.moveTo(3 * s, -27 * s);
-      ctx.lineTo(10 * s, -24 * s);
-      ctx.lineTo(8 * s, -22 * s);
-      ctx.closePath();
+      ctx.ellipse(-16 * s, -4 * s, 1.5 * s, 1 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(-11 * s, -4 * s, 1.5 * s, 1 * s, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // legs
-      ctx.strokeStyle = "#ff9bb8";
-      ctx.lineWidth   = 2 * s;
-      [[-2, -3], [3, 4]].forEach(([lx]) => {
+      // ears
+      ctx.fillStyle = "#5a6a55";
+      [[-18, -7], [-8, -7]].forEach(([ex, ey]) => {
         ctx.beginPath();
-        ctx.moveTo(lx * s, 4 * s);
-        ctx.lineTo((lx - 1) * s, 17 * s);
-        ctx.stroke();
+        ctx.arc(ex * s, ey * s, 2.5 * s, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // eyes
+      ctx.fillStyle = "#1a1a0a";
+      [[-17, -6], [-10, -6]].forEach(([ex, ey]) => {
+        ctx.beginPath();
+        ctx.arc(ex * s, ey * s, 1.2 * s, 0, Math.PI * 2);
+        ctx.fill();
       });
 
       ctx.restore();
@@ -249,17 +243,14 @@ export default function CinematicHero({ className }: { className?: string }) {
         ctx.fillRect(Math.max(0, lx), ry, Math.min(lw, W - Math.max(0, lx)), 1.5);
       }
 
-      // ── Flamingos ───────────────────────────────────────────────────────
-      const fpos: [number, number, number, number][] = [
-        [W * 0.10, LY + H * 0.038, 0.52, -1],
-        [W * 0.16, LY + H * 0.032, 0.60,  1],
-        [W * 0.22, LY + H * 0.028, 0.66,  1],
-        [W * 0.29, LY + H * 0.042, 0.50, -1],
-        [W * 0.77, LY + H * 0.035, 0.56,  1],
-        [W * 0.83, LY + H * 0.029, 0.63, -1],
-        [W * 0.89, LY + H * 0.044, 0.48,  1],
+      // ── Hippos (Lake Naivasha's iconic resident) ─────────────────────────
+      const hpos: [number, number, number][] = [
+        [W * 0.12, LY + H * 0.036, 0.55],
+        [W * 0.22, LY + H * 0.028, 0.65],
+        [W * 0.80, LY + H * 0.033, 0.58],
+        [W * 0.90, LY + H * 0.040, 0.50],
       ];
-      for (const [fx, fy, fs, ff] of fpos) drawFlamingo(fx, fy, fs, ff);
+      for (const [hx, hy, hs] of hpos) drawHippo(hx, hy, hs);
 
       // ── Shore / foreground ───────────────────────────────────────────────
       ctx.fillStyle = "#1c4a0c";

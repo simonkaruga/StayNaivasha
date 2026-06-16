@@ -1,15 +1,26 @@
+/**
+ * useSEO — drop this call at the top of any page component.
+ *
+ * Sets: document.title, meta description, og:/twitter: tags, canonical link,
+ * and injects JSON-LD structured data (tells Google *what* the page is).
+ *
+ * Google executes JavaScript so this works for search ranking.
+ * Social-media link previews (WhatsApp/Facebook) fall back to index.html defaults.
+ */
 import { useEffect } from "react";
 
 interface SEOMeta {
-  title: string;
+  title:        string;
   description?: string;
-  image?: string;
-  url?: string;
-  type?: "website" | "article";
+  image?:       string;
+  url?:         string;
+  type?:        "website" | "article";
+  jsonLd?:      object | object[];
+  noIndex?:     boolean;
 }
 
-const SITE_NAME = "StayNaivasha";
-const DEFAULT_DESC = "Kenya's first local-first vacation rental platform. Verified homes, cottages & retreats in Naivasha. Book via M-Pesa in 30 seconds.";
+const SITE_NAME    = "StayNaivasha";
+const DEFAULT_DESC = "Book holiday homes, cottages, villas & campsites in Naivasha, Kenya. Secure M-Pesa payments. Verified listings. Instant confirmation.";
 const DEFAULT_IMAGE = "https://staynaivasha.co.ke/icons/icon-512.png";
 
 function setMeta(attr: string, key: string, value: string) {
@@ -22,29 +33,60 @@ function setMeta(attr: string, key: string, value: string) {
   el.setAttribute("content", value);
 }
 
-export function useSEO({ title, description, image, url, type = "website" }: SEOMeta) {
+function injectJsonLd(data: object | object[]) {
+  let script = document.getElementById("page-json-ld") as HTMLScriptElement | null;
+  if (!script) {
+    script = document.createElement("script");
+    script.id   = "page-json-ld";
+    script.type = "application/ld+json";
+    document.head.appendChild(script);
+  }
+  script.textContent = JSON.stringify(Array.isArray(data) ? { "@graph": data } : data);
+}
+
+function removeJsonLd() {
+  document.getElementById("page-json-ld")?.remove();
+}
+
+export function useSEO({ title, description, image, url, type = "website", jsonLd, noIndex }: SEOMeta) {
   useEffect(() => {
-    const fullTitle = `${title} — ${SITE_NAME}`;
-    const desc  = description ?? DEFAULT_DESC;
-    const img   = image ?? DEFAULT_IMAGE;
-    const canonical = url ?? window.location.href;
+    const fullTitle = `${title} | ${SITE_NAME}`;
+    const desc      = description ?? DEFAULT_DESC;
+    const img       = image       ?? DEFAULT_IMAGE;
+    const canonical = url ? `https://staynaivasha.co.ke${url}` : window.location.href;
 
     document.title = fullTitle;
 
-    setMeta("name",     "description",    desc);
-    setMeta("property", "og:title",       fullTitle);
-    setMeta("property", "og:description", desc);
-    setMeta("property", "og:image",       img);
-    setMeta("property", "og:url",         canonical);
-    setMeta("property", "og:type",        type);
-    setMeta("property", "og:site_name",   SITE_NAME);
-    setMeta("name",     "twitter:card",   "summary_large_image");
-    setMeta("name",     "twitter:title",  fullTitle);
+    setMeta("name",     "description",         desc);
+    setMeta("name",     "robots", noIndex
+      ? "noindex, nofollow"
+      : "index, follow, max-snippet:-1, max-image-preview:large");
+    setMeta("property", "og:title",            fullTitle);
+    setMeta("property", "og:description",      desc);
+    setMeta("property", "og:image",            img);
+    setMeta("property", "og:url",              canonical);
+    setMeta("property", "og:type",             type);
+    setMeta("property", "og:site_name",        SITE_NAME);
+    setMeta("name",     "twitter:card",        "summary_large_image");
+    setMeta("name",     "twitter:title",       fullTitle);
     setMeta("name",     "twitter:description", desc);
-    setMeta("name",     "twitter:image",  img);
+    setMeta("name",     "twitter:image",       img);
+
+    let link = document.querySelector<HTMLLinkElement>("link[rel='canonical']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "canonical";
+      document.head.appendChild(link);
+    }
+    link.href = canonical;
+
+    if (jsonLd) injectJsonLd(jsonLd);
+    else        removeJsonLd();
 
     return () => {
-      document.title = `${SITE_NAME} — Vacation Rentals in Naivasha, Kenya`;
+      document.title = `${SITE_NAME} — Holiday Homes & Cottages in Naivasha, Kenya`;
+      removeJsonLd();
     };
-  }, [title, description, image, url, type]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, image, url, type, noIndex]);
 }

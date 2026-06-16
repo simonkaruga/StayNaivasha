@@ -25,8 +25,10 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
     name: Mapped[Optional[str]] = mapped_column(String(120))
-    phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
-    email: Mapped[Optional[str]] = mapped_column(String(255))
+    phone: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255))
+    google_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, nullable=True)
     role: Mapped[str] = mapped_column(Enum("guest", "owner", "admin", "banned", name="user_role"), default="guest")
     national_id_url: Mapped[Optional[str]] = mapped_column(String(500))
     passport_number: Mapped[Optional[str]] = mapped_column(String(50))
@@ -77,6 +79,20 @@ class PropertyImage(Base):
     property: Mapped["Property"] = relationship(back_populates="images")
 
 
+class ExternalCalendar(Base):
+    """One row per external platform the owner listed on (Airbnb, Booking.com, VRBO…)."""
+    __tablename__ = "external_calendars"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    property_id: Mapped[str] = mapped_column(ForeignKey("properties.id"), nullable=False)
+    platform: Mapped[str] = mapped_column(String(50), nullable=False)   # "airbnb" | "booking" | "vrbo" | "other"
+    ical_url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    property: Mapped["Property"] = relationship()
+
+
 class Availability(Base):
     __tablename__ = "availability"
 
@@ -104,6 +120,11 @@ class Booking(Base):
         Enum("pending", "confirmed", "checked_in", "completed", "cancelled", name="booking_status"),
         default="pending",
     )
+    guests: Mapped[int] = mapped_column(SmallInteger, default=1)
+    group_name: Mapped[Optional[str]] = mapped_column(String(150))
+    is_corporate: Mapped[bool] = mapped_column(Boolean, default=False)
+    company_name: Mapped[Optional[str]] = mapped_column(String(200))
+    kra_pin: Mapped[Optional[str]] = mapped_column(String(20))
     checkin_code: Mapped[Optional[str]] = mapped_column(String(4))
     mpesa_ref: Mapped[Optional[str]] = mapped_column(String(50))
     terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -183,6 +204,41 @@ class OwnerApplication(Base):
     reviewed_by: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"), nullable=True)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Agent(Base):
+    """Travel agents / brokers who refer bookings and earn M-Pesa commission."""
+    __tablename__ = "agents"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, unique=True)
+    agency_name: Mapped[Optional[str]] = mapped_column(String(200))
+    commission_pct: Mapped[int] = mapped_column(SmallInteger, default=5)  # percentage
+    status: Mapped[str] = mapped_column(
+        Enum("pending", "active", "suspended", name="agent_status"), default="pending"
+    )
+    total_earned: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped["User"] = relationship()
+    referrals: Mapped[list["AgentReferral"]] = relationship(back_populates="agent")
+
+
+class AgentReferral(Base):
+    """Tracks each booking that came through an agent."""
+    __tablename__ = "agent_referrals"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    booking_id: Mapped[str] = mapped_column(ForeignKey("bookings.id"), nullable=False, unique=True)
+    commission_kes: Mapped[int] = mapped_column(BigInteger, default=0)
+    status: Mapped[str] = mapped_column(
+        Enum("pending", "paid", "cancelled", name="referral_status"), default="pending"
+    )
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    agent: Mapped["Agent"] = relationship(back_populates="referrals")
 
 
 class DamageClaim(Base):

@@ -17,6 +17,7 @@ class TokenResponse(BaseModel):
     role: str
     phone: Optional[str] = None
     name: Optional[str] = None
+    email: Optional[str] = None
 
 
 # ── Properties ───────────────────────────────────────────────────────────────
@@ -89,15 +90,25 @@ class BookingCreate(BaseModel):
     guests: int = Field(..., ge=1)
     promo_code: Optional[str] = None
     terms_accepted: bool = Field(..., description="Must be True to proceed")
+    group_name: Optional[str] = None
+    is_corporate: bool = False
+    company_name: Optional[str] = None
+    kra_pin: Optional[str] = None
 
 class BookingOut(BaseModel):
     id: str
     property_id: str
+    property_title: Optional[str] = None
     check_in: date
     check_out: date
     total_amount: int
     platform_fee: int
     deposit_amount: int
+    guests: int = 1
+    group_name: Optional[str] = None
+    is_corporate: bool = False
+    company_name: Optional[str] = None
+    kra_pin: Optional[str] = None
     status: str
     checkin_code: Optional[str] = None
     mpesa_ref: Optional[str] = None

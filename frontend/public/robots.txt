@@ -1,6 +1,10 @@
 User-agent: *
 Allow: /
-Disallow: /owner
-Disallow: /admin
+
+# Keep dashboard and API routes off Google
+Disallow: /owner/
+Disallow: /admin/
+Disallow: /agent/
+Disallow: /api/
 
 Sitemap: https://staynaivasha.co.ke/sitemap.xml

@@ -74,10 +74,16 @@
   html {
     /* Force light mode always — the app is designed white/clean */
     color-scheme: light;
+    /* 106.25% ≈ 17px — one step up from the 16px browser default.
+       This scales every rem-based Tailwind class (text-xs → 12.75px,
+       text-sm → 14.9px, text-base → 17px) without touching layout. */
+    font-size: 106.25%;
     font-family: "Inter", sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
     -webkit-tap-highlight-color: transparent;
+    /* Comfortable line-height for readers */
+    line-height: 1.6;
   }
 
   * { min-width: 0; }

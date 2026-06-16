@@ -1,10 +1,14 @@
 import { useNavigate } from "react-router-dom";
+import { Home as HomeIcon } from "lucide-react";
 
 export default function NotFound() {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col items-center justify-center px-6 pb-24 text-center space-y-5">
-      <div className="text-6xl">🏡</div>
+      <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
+        style={{ background: "rgba(30,74,34,0.08)" }}>
+        <HomeIcon size={36} style={{ color: "#1e4a22" }} />
+      </div>
       <div>
         <h1 className="font-display italic text-3xl text-[var(--text-primary)] mb-2">Lost in Naivasha?</h1>
         <p className="text-[var(--text-muted)] text-sm max-w-xs">

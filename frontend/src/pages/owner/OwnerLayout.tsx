@@ -1,7 +1,13 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Routes, Route, NavLink, useNavigate, useParams } from "react-router-dom";
-import { Home as HomeIcon, Sparkles, Clock, Camera } from "lucide-react";
+import {
+  Home as HomeIcon, Sparkles,
+  Building2, CalendarDays, TrendingUp, LayoutGrid,
+  Link2, AlertCircle, ChevronRight, ExternalLink,
+} from "lucide-react";
+import PhotoUploader, { UploadedPhoto } from "../../components/PhotoUploader";
+import LocationPicker from "../../components/LocationPicker";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -85,6 +91,9 @@ function Dashboard() {
         </div>
       )}
 
+      {/* Quick block — prominent card for owners who also list on Airbnb/Booking.com */}
+      <QuickBlockCard />
+
       {/* Upcoming bookings */}
       {(data?.upcoming?.length ?? 0) > 0 && (
         <div>
@@ -120,6 +129,83 @@ function Dashboard() {
   );
 }
 
+// ── Quick block card (shown on dashboard for multi-platform owners) ────────────
+
+function QuickBlockCard() {
+  const { data: myProps } = useOwnerProperties();
+  const [open,       setOpen]       = useState(false);
+  const [propertyId, setPropertyId] = useState("");
+  const [checkIn,    setCheckIn]    = useState("");
+  const [checkOut,   setCheckOut]   = useState("");
+  const [saving,     setSaving]     = useState(false);
+  const [result,     setResult]     = useState<"ok" | "error" | null>(null);
+
+  async function block() {
+    if (!propertyId || !checkIn || !checkOut) return;
+    setSaving(true); setResult(null);
+    const res = await api("/owner/block-dates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ property_id: propertyId, check_in: checkIn, check_out: checkOut }),
+    });
+    setResult(res.ok ? "ok" : "error");
+    setSaving(false);
+    if (res.ok) { setCheckIn(""); setCheckOut(""); }
+  }
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-[#d4892a]/25"
+      style={{ background: "rgba(212,137,42,0.06)" }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3.5 text-left">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: "rgba(212,137,42,0.15)" }}>
+            <AlertCircle size={16} className="text-[#d4892a]" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Got a booking on Airbnb?</p>
+            <p className="text-xs text-[var(--text-muted)]">Block those dates here instantly</p>
+          </div>
+        </div>
+        <ChevronRight size={16} className={`text-[var(--text-muted)] transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-[#d4892a]/15 pt-3">
+          <p className="text-xs text-[var(--text-muted)]">
+            Or text <span className="font-mono font-semibold text-[var(--text-primary)]">BLOCK [code] [from] [to]</span> to our WhatsApp number — works even faster.
+          </p>
+          <Field label="Property">
+            <select value={propertyId} onChange={e => setPropertyId(e.target.value)} className={inputCls}>
+              <option value="">Select…</option>
+              {(myProps ?? []).map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Check-in">
+              <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)}
+                min={new Date().toISOString().split("T")[0]} className={inputCls} />
+            </Field>
+            <Field label="Check-out">
+              <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)}
+                min={checkIn} className={inputCls} />
+            </Field>
+          </div>
+          <button onClick={block} disabled={saving || !propertyId || !checkIn || !checkOut}
+            className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
+            style={{ background: "#d4892a" }}>
+            {saving ? "Blocking…" : "Block these dates now"}
+          </button>
+          {result === "ok"    && <p className="text-sm text-[var(--color-teal)] text-center">Done — dates are blocked. No new bookings can come in.</p>}
+          {result === "error" && <p className="text-sm text-red-500 text-center">Something went wrong. Try again.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NewListing() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -132,8 +218,7 @@ function NewListing() {
   const [aiLoading, setAiLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
 
   function set(key: string, val: string) {
     setForm(f => ({ ...f, [key]: val }));
@@ -158,40 +243,14 @@ function NewListing() {
     setAiLoading(false);
   }
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    setUploading(true);
-    // Upload via Cloudinary unsigned upload preset — VITE_CLOUDINARY_CLOUD and VITE_CLOUDINARY_PRESET needed
-    const cloud = (import.meta as any).env?.VITE_CLOUDINARY_CLOUD;
-    const preset = (import.meta as any).env?.VITE_CLOUDINARY_PRESET ?? "staynaivasha";
-    const urls: string[] = [];
-    for (const file of files) {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("upload_preset", preset);
-      try {
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: "POST", body: fd });
-        if (res.ok) {
-          const data = await res.json();
-          urls.push(data.secure_url);
-        }
-      } catch {
-        // skip failed upload
-      }
-    }
-    setUploadedImages(prev => [...prev, ...urls]);
-    setUploading(false);
-  }
-
-  async function saveImages(propertyId: string, imageUrls: string[]) {
-    for (let i = 0; i < imageUrls.length; i++) {
+  async function saveImages(propertyId: string, readyPhotos: UploadedPhoto[]) {
+    for (let i = 0; i < readyPhotos.length; i++) {
       await api("/owner/images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           property_id: propertyId,
-          cloudinary_url: imageUrls[i],
+          cloudinary_url: readyPhotos[i].url,
           is_primary: i === 0,
           display_order: i,
         }),
@@ -218,8 +277,9 @@ function NewListing() {
     setSaving(false);
     if (res.ok) {
       const saved = await res.json();
-      if (uploadedImages.length > 0) {
-        await saveImages(saved.id, uploadedImages);
+      const readyPhotos = photos.filter(p => p.done && !p.error && p.url);
+      if (readyPhotos.length > 0) {
+        await saveImages(saved.id, readyPhotos);
       }
       queryClient.invalidateQueries({ queryKey: ["owner-dash"] });
       queryClient.invalidateQueries({ queryKey: ["owner-properties"] });
@@ -241,7 +301,7 @@ function NewListing() {
 
       <Field label="Property title *">
         <input required value={form.title} onChange={e => set("title", e.target.value)}
-          placeholder="e.g. Lakeside Cottage with Flamingo Views"
+          placeholder="e.g. Lakeside Cottage with Hippo Views"
           className={inputCls} />
       </Field>
 
@@ -316,19 +376,14 @@ function NewListing() {
           rows={4} className={`${inputCls} resize-none`} />
       </div>
 
-      {/* GPS */}
+      {/* Location */}
       <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-3">
-        <p className="text-sm font-medium text-[var(--text-primary)]">Location</p>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Latitude">
-            <input type="number" step="any" value={form.lat}
-              onChange={e => set("lat", e.target.value)} placeholder="-0.7297" className={inputCls} />
-          </Field>
-          <Field label="Longitude">
-            <input type="number" step="any" value={form.lng}
-              onChange={e => set("lng", e.target.value)} placeholder="36.4311" className={inputCls} />
-          </Field>
-        </div>
+        <p className="text-sm font-medium text-[var(--text-primary)]">Location pin</p>
+        <LocationPicker
+          lat={form.lat}
+          lng={form.lng}
+          onChange={(lat, lng) => { set("lat", lat); set("lng", lng); }}
+        />
         <Field label="What3words (optional)">
           <input value={form.what3words} onChange={e => set("what3words", e.target.value)}
             placeholder="e.g. lake.gate.path" className={inputCls} />
@@ -343,36 +398,8 @@ function NewListing() {
 
       {/* Photos */}
       <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-[var(--text-primary)]">
-            Photos
-            <span className="ml-2 text-xs text-[var(--text-muted)]">{uploadedImages.length}/8 minimum</span>
-          </p>
-        </div>
-        <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-6 cursor-pointer transition-colors ${uploading ? "opacity-50" : "border-[var(--border)] hover:border-[var(--color-teal)]"}`}>
-          <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} disabled={uploading} />
-          {uploading ? <Clock className="w-6 h-6 text-[var(--text-muted)]" /> : <Camera className="w-6 h-6 text-[var(--text-muted)]" />}
-          <span className="text-xs text-[var(--text-muted)]">{uploading ? "Uploading…" : "Tap to add photos (natural daylight, every room + view)"}</span>
-        </label>
-        {uploadedImages.length > 0 && (
-          <div className="grid grid-cols-4 gap-1.5">
-            {uploadedImages.map((url, i) => (
-              <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
-                <img src={url} alt="" className="w-full h-full object-cover" />
-                {i === 0 && (
-                  <span className="absolute bottom-0 left-0 right-0 text-center text-[10px] bg-[var(--color-forest)] text-white py-0.5">Primary</span>
-                )}
-                <button type="button" onClick={() => setUploadedImages(imgs => imgs.filter((_, j) => j !== i))}
-                  className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 text-white rounded-full text-xs flex items-center justify-center leading-none">
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        {uploadedImages.length > 0 && uploadedImages.length < 8 && (
-          <p className="text-xs text-amber-600">Add {8 - uploadedImages.length} more photo{8 - uploadedImages.length !== 1 ? "s" : ""} — minimum 8 required for approval</p>
-        )}
+        <p className="text-sm font-medium text-[var(--text-primary)]">Photos &amp; videos</p>
+        <PhotoUploader value={photos} onChange={setPhotos} />
       </div>
 
       {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -381,9 +408,9 @@ function NewListing() {
         Your listing goes live after admin review
       </p>
 
-      <button type="submit" disabled={saving || uploading}
+      <button type="submit" disabled={saving || photos.some(p => !p.done)}
         className="w-full bg-[var(--color-forest)] disabled:bg-gray-300 text-white font-semibold py-3.5 rounded-2xl text-sm">
-        {saving ? "Saving…" : "Save listing"}
+        {saving ? "Saving…" : photos.some(p => !p.done) ? "Uploading photos…" : "Save listing"}
       </button>
     </form>
   );
@@ -403,6 +430,7 @@ function EditListing() {
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
   const [loaded,  setLoaded]  = useState(false);
+  const [newPhotos, setNewPhotos] = useState<UploadedPhoto[]>([]);
 
   // Load existing data
   useEffect(() => {
@@ -445,13 +473,26 @@ function EditListing() {
         no_checkout_days: form.no_checkout_days || null,
       }),
     });
-    setSaving(false);
-    if (r.ok) {
+    if (r.ok && propId) {
+      const readyPhotos = newPhotos.filter(p => p.done && !p.error && p.url);
+      for (let i = 0; i < readyPhotos.length; i++) {
+        await api("/owner/images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            property_id: propId,
+            cloudinary_url: readyPhotos[i].url,
+            is_primary: false,
+            display_order: 999 + i,
+          }),
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["owner-properties"] });
       navigate("/owner/listings");
-    } else {
+    } else if (!r.ok) {
       const d = await r.json(); setError(d.detail ?? "Failed to save");
     }
+    setSaving(false);
   }
 
   if (!loaded) return <LoadingSpinner />;
@@ -528,32 +569,35 @@ function EditListing() {
       </Field>
 
       <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-3">
-        <p className="text-sm font-medium text-[var(--text-primary)]">Location</p>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Latitude">
-            <input type="number" step="any" value={form.lat}
-              onChange={e => set("lat", e.target.value)} placeholder="-0.7297" className={inputCls} />
-          </Field>
-          <Field label="Longitude">
-            <input type="number" step="any" value={form.lng}
-              onChange={e => set("lng", e.target.value)} placeholder="36.4311" className={inputCls} />
-          </Field>
-        </div>
+        <p className="text-sm font-medium text-[var(--text-primary)]">Location pin</p>
+        <LocationPicker
+          lat={form.lat}
+          lng={form.lng}
+          onChange={(lat, lng) => { set("lat", lat); set("lng", lng); }}
+        />
         <Field label="What3words (optional)">
           <input value={form.what3words} onChange={e => set("what3words", e.target.value)}
             placeholder="e.g. lake.gate.path" className={inputCls} />
         </Field>
         <Field label="Landmark directions">
           <textarea value={form.landmark_instructions} onChange={e => set("landmark_instructions", e.target.value)}
+            placeholder="e.g. From Total petrol station, green gate 200m on left"
             rows={2} className={`${inputCls} resize-none`} />
         </Field>
       </div>
 
+      {/* Add more photos */}
+      <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-medium text-[var(--text-primary)]">Add more photos &amp; videos</p>
+        <p className="text-[13px] text-[var(--text-muted)]">New photos are added to the existing gallery</p>
+        <PhotoUploader value={newPhotos} onChange={setNewPhotos} />
+      </div>
+
       {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-      <button type="submit" disabled={saving}
+      <button type="submit" disabled={saving || newPhotos.some(p => !p.done)}
         className="w-full bg-[var(--color-forest)] disabled:bg-gray-300 text-white font-bold py-3.5 rounded-2xl text-sm">
-        {saving ? "Saving…" : "Save changes"}
+        {saving ? "Saving…" : newPhotos.some(p => !p.done) ? "Uploading photos…" : "Save changes"}
       </button>
     </form>
   );
@@ -819,67 +863,164 @@ function OwnerCalendar() {
 }
 
 
+const PLATFORM_LABELS: Record<string, { label: string; color: string; hint: string }> = {
+  airbnb:  { label: "Airbnb",       color: "#FF5A5F", hint: "Airbnb → Calendar → Export calendar" },
+  booking: { label: "Booking.com",  color: "#003580", hint: "Booking.com → Calendar → iCal" },
+  vrbo:    { label: "VRBO",         color: "#1C5E8C", hint: "VRBO → Calendars → Export" },
+  other:   { label: "Other",        color: "#6B7280", hint: "Any iCal (.ics) URL" },
+};
+
+interface ExternalCal { id: string; platform: string; ical_url: string; last_synced_at: string | null; }
+
 function ICalSync() {
   const [propertyId, setPropertyId] = useState("");
-  const [url, setUrl] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [platform,   setPlatform]   = useState("airbnb");
+  const [url,        setUrl]        = useState("");
+  const [addStatus,  setAddStatus]  = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [calendars,  setCalendars]  = useState<ExternalCal[]>([]);
+  const [copied,     setCopied]     = useState(false);
   const { data: myProps } = useOwnerProperties();
 
-  async function handleImport() {
+  useEffect(() => {
+    if (!propertyId) return;
+    api(`/ical/calendars/${propertyId}`).then(r => r.ok ? r.json() : []).then(setCalendars);
+  }, [propertyId, addStatus]);
+
+  async function handleAdd() {
     if (!propertyId || !url) return;
-    setStatus("loading");
-    const res = await api("/ical/import", {
+    setAddStatus("loading");
+    const res = await api("/ical/calendars", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ property_id: propertyId, ical_url: url }),
+      body: JSON.stringify({ property_id: propertyId, platform, ical_url: url }),
     });
-    setStatus(res.ok ? "ok" : "error");
+    setAddStatus(res.ok ? "ok" : "error");
+    if (res.ok) setUrl("");
   }
 
-  return (
-    <div className="space-y-4">
-      <h1 className="font-semibold text-[var(--text-primary)]">iCal sync</h1>
-      <p className="text-sm text-[var(--text-muted)]">
-        Paste your Airbnb or Booking.com calendar URL to automatically block those dates here.
-        We sync every 2 hours.
-      </p>
+  async function handleRemove(calId: string) {
+    await api(`/ical/calendars/${calId}`, { method: "DELETE" });
+    setCalendars(c => c.filter(x => x.id !== calId));
+  }
 
+  function copyExportUrl() {
+    navigator.clipboard.writeText(`https://staynaivasha.co.ke/api/ical/export/${propertyId}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const exportUrl = `https://staynaivasha.co.ke/api/ical/export/${propertyId}`;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="font-semibold text-[var(--text-primary)] text-lg">Calendar sync</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
+          Connect every platform you list on. We sync every <strong>30 minutes</strong> and alert you
+          immediately on WhatsApp if a double-booking is detected.
+        </p>
+      </div>
+
+      {/* How it prevents double-bookings */}
+      <div className="rounded-2xl p-4 space-y-2.5"
+        style={{ background: "rgba(30,74,34,0.06)", border: "1px solid rgba(30,74,34,0.14)" }}>
+        <p className="text-sm font-semibold text-[var(--color-forest)]">How double-booking protection works</p>
+        {[
+          "Paste each platform's iCal URL below — we import their blocked dates automatically",
+          "Copy your StayNaivasha export URL and paste it into Airbnb & Booking.com as an external calendar",
+          "We sync every 30 minutes both ways. If a conflict is ever found, you get a WhatsApp alert instantly",
+        ].map((s, i) => (
+          <div key={i} className="flex gap-2.5">
+            <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 mt-0.5"
+              style={{ background: "#1e4a22" }}>{i + 1}</span>
+            <p className="text-sm text-[var(--text-muted)]">{s}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Property selector */}
       <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-3">
-        <Field label="Property">
-          <select value={propertyId} onChange={e => setPropertyId(e.target.value)} className={inputCls}>
-            <option value="">Select a property</option>
-            {(myProps ?? []).map(p => (
-              <option key={p.id} value={p.id}>{p.title}</option>
-            ))}
+        <Field label="Select property">
+          <select value={propertyId} onChange={e => { setPropertyId(e.target.value); setAddStatus("idle"); }} className={inputCls}>
+            <option value="">Choose a property…</option>
+            {(myProps ?? []).map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
         </Field>
-        <Field label="iCal URL (from Airbnb / Booking.com)">
-          <input value={url} onChange={e => setUrl(e.target.value)}
-            placeholder="https://www.airbnb.com/calendar/ical/..." className={inputCls} />
-        </Field>
-        <button onClick={handleImport} disabled={status === "loading" || !propertyId || !url}
-          className="w-full bg-[var(--color-forest)] disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl text-sm">
-          {status === "loading" ? "Syncing…" : "Import & sync now"}
-        </button>
-        {status === "ok" && <p className="text-[var(--color-teal)] text-sm text-center">✓ Synced! Dates are now blocked.</p>}
-        {status === "error" && <p className="text-red-500 text-sm text-center">Could not fetch that URL — make sure it's public.</p>}
       </div>
 
-      <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-2">
-        <p className="text-sm font-medium text-[var(--text-primary)]">Export your StayNaivasha calendar</p>
-        <p className="text-xs text-[var(--text-muted)]">
-          Copy the URL below and paste into Airbnb/Booking.com as an external calendar.
-        </p>
-        <div className="bg-[var(--bg-primary)] rounded-xl px-3 py-2 flex items-center gap-2">
-          <p className="text-xs text-[var(--text-muted)] flex-1 truncate font-mono">
-            https://staynaivasha.co.ke/api/ical/{"{your-property-id}"}
-          </p>
-          <button onClick={() => navigator.clipboard.writeText(`https://staynaivasha.co.ke/api/ical/${propertyId}`)}
-            className="text-xs text-[var(--color-teal)] font-medium flex-shrink-0">
-            Copy
-          </button>
-        </div>
-      </div>
+      {propertyId && (
+        <>
+          {/* Connected calendars list */}
+          <div className="bg-[var(--bg-surface)] rounded-2xl overflow-hidden">
+            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide px-4 pt-4 pb-2">
+              Connected platforms
+            </p>
+            {calendars.length === 0 ? (
+              <p className="text-sm text-[var(--text-muted)] px-4 pb-4">None yet — add your first one below.</p>
+            ) : (
+              <div className="divide-y divide-[var(--border)]">
+                {calendars.map(c => {
+                  const pl = PLATFORM_LABELS[c.platform] ?? PLATFORM_LABELS.other;
+                  return (
+                    <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: pl.color }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{pl.label}</p>
+                        <p className="text-[12px] text-[var(--text-muted)] truncate">{c.ical_url}</p>
+                        {c.last_synced_at && (
+                          <p className="text-[12px] text-[var(--color-teal)]">
+                            Last synced {new Date(c.last_synced_at).toLocaleString("en-KE", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}
+                          </p>
+                        )}
+                      </div>
+                      <button onClick={() => handleRemove(c.id)}
+                        className="text-red-500 text-[12px] font-semibold flex-shrink-0">Remove</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Add new calendar */}
+          <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Add a calendar</p>
+            <Field label="Platform">
+              <select value={platform} onChange={e => setPlatform(e.target.value)} className={inputCls}>
+                {Object.entries(PLATFORM_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={`iCal URL — ${PLATFORM_LABELS[platform]?.hint}`}>
+              <input value={url} onChange={e => setUrl(e.target.value)}
+                placeholder="https://…" className={inputCls} />
+            </Field>
+            <button onClick={handleAdd} disabled={addStatus === "loading" || !url}
+              className="w-full bg-[var(--color-forest)] disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl text-sm">
+              {addStatus === "loading" ? "Connecting…" : `Connect ${PLATFORM_LABELS[platform]?.label}`}
+            </button>
+            {addStatus === "ok"    && <p className="text-[var(--color-teal)] text-sm text-center">Connected! Syncing now — dates will be blocked within a minute.</p>}
+            {addStatus === "error" && <p className="text-red-500 text-sm text-center">Could not fetch that URL. Make sure the calendar is set to public.</p>}
+          </div>
+
+          {/* Export URL */}
+          <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-2">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Your StayNaivasha export URL</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              Paste this into Airbnb and Booking.com as an "external calendar" so they block your StayNaivasha dates automatically.
+            </p>
+            <div className="bg-[var(--bg-primary)] rounded-xl px-3 py-2.5 flex items-center gap-2">
+              <p className="text-[12px] text-[var(--text-muted)] flex-1 truncate font-mono">{exportUrl}</p>
+              <button onClick={copyExportUrl}
+                className="text-sm font-semibold flex-shrink-0"
+                style={{ color: copied ? "#1e4a22" : "var(--color-teal)" }}>
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1122,51 +1263,128 @@ function DamageClaims() {
   );
 }
 
-// ── Owner nav ─────────────────────────────────────────────────────────────────
+// ── More menu (Calendar · iCal · Claims · New listing) ───────────────────────
 
-const ownerTabs = [
-  { to: "/owner", label: "Home", end: true },
-  { to: "/owner/listings", label: "Listings" },
-  { to: "/owner/listing/new", label: "+ New" },
-  { to: "/owner/bookings", label: "Bookings" },
-  { to: "/owner/earnings", label: "Earnings" },
-  { to: "/owner/calendar", label: "Calendar" },
-  { to: "/owner/ical", label: "iCal" },
-  { to: "/owner/claims", label: "Claims" },
-];
+function MoreMenu() {
+  const navigate = useNavigate();
+  const items = [
+    { to: "/owner/calendar",    Icon: CalendarDays, label: "Availability calendar", desc: "Block or open dates on your property" },
+    { to: "/owner/ical",        Icon: Link2,        label: "iCal sync",             desc: "Connect Airbnb / Booking.com calendar" },
+    { to: "/owner/claims",      Icon: AlertCircle,  label: "Damage claims",         desc: "File or track a damage claim" },
+    { to: "/owner/listing/new", Icon: Building2,    label: "Add new listing",       desc: "List another property on StayNaivasha" },
+    { to: "/",                  Icon: ExternalLink, label: "Browse as guest",       desc: "Switch to the guest-facing portal" },
+  ];
+  return (
+    <div>
+      <h1 className="font-semibold text-[var(--text-primary)] mb-4">More</h1>
+      <div className="space-y-2">
+        {items.map(({ to, Icon, label, desc }) => (
+          <button key={to} type="button" onClick={() => navigate(to)}
+            className="w-full flex items-center gap-4 bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl px-4 py-4 text-left active:scale-[.98] transition-transform">
+            <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(30,74,34,0.08)" }}>
+              <Icon className="w-5 h-5 text-[var(--color-forest)]" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{label}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">{desc}</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Bottom nav tabs ───────────────────────────────────────────────────────────
+
+const OWNER_TABS = [
+  { to: "/owner",          label: "Home",     Icon: HomeIcon,     end: true  },
+  { to: "/owner/listings", label: "Listings", Icon: Building2,    end: false },
+  { to: "/owner/bookings", label: "Bookings", Icon: CalendarDays, end: false },
+  { to: "/owner/earnings", label: "Earnings", Icon: TrendingUp,   end: false },
+  { to: "/owner/more",     label: "More",     Icon: LayoutGrid,   end: false },
+] as const;
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 export default function OwnerLayout() {
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Top nav */}
-      <div className="sticky top-0 z-40 bg-[var(--bg-surface)] border-b border-[var(--border)] px-4 py-3 flex items-center justify-between">
-        <p className="font-display italic text-lg text-[var(--color-forest)]">StayNaivasha</p>
-        <div className="flex gap-4 overflow-x-auto scrollbar-none">
-          {ownerTabs.map(t => (
-            <NavLink key={t.to} to={t.to} end={t.end}
-              className={({ isActive }) =>
-                `flex-shrink-0 text-sm font-medium ${isActive ? "text-[var(--color-forest)]" : "text-[var(--text-muted)]"}`}>
-              {t.label}
-            </NavLink>
-          ))}
-        </div>
-      </div>
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-20 pb-20">
 
+      {/* ── Host top bar ── */}
+      <header
+        className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center px-4 border-b border-[var(--border)]"
+        style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" }}
+      >
+        <div className="flex items-center gap-2 mr-auto">
+          <span
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black flex-shrink-0"
+            style={{ background: "linear-gradient(135deg, #1e4a22 0%, #2a6030 60%, #b8722a 100%)", boxShadow: "0 2px 8px rgba(30,74,34,0.30)" }}
+          >SN</span>
+          <span className="font-display italic text-[var(--color-forest)] leading-none" style={{ fontSize: "1.15rem" }}>
+            StayNaivasha
+          </span>
+          <span className="ml-1 text-[13px] font-bold text-[var(--color-teal)] bg-[var(--color-teal)]/10 px-2 py-0.5 rounded-full">
+            Host
+          </span>
+        </div>
+        <NavLink to="/" className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+          <ExternalLink className="w-3.5 h-3.5" /> Guest view
+        </NavLink>
+      </header>
+
+      {/* ── Page content ── */}
       <div className="px-4 py-5 max-w-lg mx-auto">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/listings" element={<MyListings />} />
-          <Route path="/listing/new" element={<NewListing />} />
+          <Route path="/"                     element={<Dashboard />} />
+          <Route path="/listings"             element={<MyListings />} />
+          <Route path="/listing/new"          element={<NewListing />} />
           <Route path="/listing/edit/:propId" element={<EditListing />} />
-          <Route path="/bookings" element={<OwnerBookings />} />
-          <Route path="/earnings" element={<Earnings />} />
-          <Route path="/calendar" element={<OwnerCalendar />} />
-          <Route path="/ical" element={<ICalSync />} />
-          <Route path="/claims" element={<DamageClaims />} />
+          <Route path="/bookings"             element={<OwnerBookings />} />
+          <Route path="/earnings"             element={<Earnings />} />
+          <Route path="/calendar"             element={<OwnerCalendar />} />
+          <Route path="/ical"                 element={<ICalSync />} />
+          <Route path="/claims"              element={<DamageClaims />} />
+          <Route path="/more"                 element={<MoreMenu />} />
         </Routes>
       </div>
+
+      {/* ── Host bottom nav ── */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-stretch border-t border-[var(--border)]"
+        style={{
+          background: "rgba(255,255,255,0.95)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {OWNER_TABS.map(({ to, label, Icon, end }) => (
+          <NavLink
+            key={to} to={to} end={end}
+            className={({ isActive }) =>
+              `relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors ${
+                isActive ? "text-[var(--color-forest)]" : "text-[var(--text-muted)]"
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <span className="absolute top-1.5 left-1/2 -translate-x-1/2 w-10 h-8 rounded-full"
+                    style={{ background: "rgba(30,74,34,0.08)" }} aria-hidden="true" />
+                )}
+                <Icon className="w-6 h-6 relative z-10" />
+                <span className={`text-[13px] leading-none relative z-10 ${isActive ? "font-bold" : "font-medium"}`}>
+                  {label}
+                </span>
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }

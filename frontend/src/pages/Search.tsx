@@ -20,23 +20,23 @@ function SearchCard({ p }: { p: PropertyCardData }) {
       className="flex gap-0 bg-[var(--bg-surface)] rounded-2xl overflow-hidden active:scale-[.98] transition-transform card">
       {/* Photo */}
       <div className="relative w-32 flex-shrink-0" style={{ height: 112 }}>
-        {p.primary_image
-          ? <img src={imgSrc(p.primary_image, 260)} alt={p.title} className="w-full h-full object-cover" loading="lazy" />
+        {(p.primary_image || p.images?.[0])
+          ? <img src={imgSrc(p.primary_image || p.images![0], 260)} alt={p.title} className="w-full h-full object-cover" loading="lazy" />
           : <div className="w-full h-full bg-gradient-to-br from-[var(--color-forest)] to-[var(--color-teal)] flex items-center justify-center">
               <TypeIcon type={p.type} className="w-8 h-8 text-white/30" />
             </div>
         }
         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10" />
         {isGuestFavourite && (
-          <span className="absolute top-1.5 left-1.5 bg-white text-[var(--color-nearblack)] text-[7px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">❤️ Fave</span>
+          <span className="absolute top-1.5 left-1.5 bg-white text-[var(--color-nearblack)] text-[13px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">❤️ Fave</span>
         )}
         {p.verified_tier >= 1 && (
-          <span className="absolute top-1.5 right-1.5 bg-[var(--color-teal)] text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full">Trusted</span>
+          <span className="absolute top-1.5 right-1.5 bg-[var(--color-teal)] text-white text-[13px] font-bold px-1.5 py-0.5 rounded-full">Trusted</span>
         )}
         {p.avg_rating && (
-          <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+          <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-sm text-white text-[13px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
             <span className="text-amber-400">★</span>{p.avg_rating.toFixed(1)}
-            {p.review_count ? <span className="text-white/60 font-normal text-[9px]">({p.review_count})</span> : null}
+            {p.review_count ? <span className="text-white/60 font-normal text-[12px]">({p.review_count})</span> : null}
           </span>
         )}
       </div>
@@ -46,7 +46,7 @@ function SearchCard({ p }: { p: PropertyCardData }) {
         <div>
           <div className="flex items-start justify-between gap-1">
             <div className="min-w-0">
-              <span className="inline-flex items-center gap-1 text-[9px] text-[var(--text-muted)] capitalize mb-0.5">
+              <span className="inline-flex items-center gap-1 text-[12px] text-[var(--text-muted)] capitalize mb-0.5">
                 <TypeIcon type={p.type} className="w-3 h-3" />{p.type}
               </span>
               <h3 className="text-sm font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">{p.title}</h3>
@@ -64,15 +64,15 @@ function SearchCard({ p }: { p: PropertyCardData }) {
         <div className="flex items-end justify-between">
           <div>
             {!p.avg_rating && (
-              <span className="text-[9px] bg-[var(--color-mint)]/15 text-[var(--color-teal)] font-semibold px-1.5 py-0.5 rounded-full">New</span>
+              <span className="text-[12px] bg-[var(--color-mint)]/15 text-[var(--color-teal)] font-semibold px-1.5 py-0.5 rounded-full">New</span>
             )}
             {p.review_count && p.review_count > 0 && (
-              <span className="text-[9px] text-[var(--text-muted)]">{p.review_count} review{p.review_count !== 1 ? "s" : ""}</span>
+              <span className="text-[12px] text-[var(--text-muted)]">{p.review_count} review{p.review_count !== 1 ? "s" : ""}</span>
             )}
           </div>
           <div className="text-right">
             <p className="text-sm font-bold text-[var(--text-primary)]">KES {p.price_per_night.toLocaleString()}</p>
-            <p className="text-[10px] text-[var(--text-muted)]">/night</p>
+            <p className="text-[13px] text-[var(--text-muted)]">/night</p>
           </div>
         </div>
       </div>
@@ -125,7 +125,7 @@ function FilterSheet({
             {AMENITY_CHIPS.map(chip => (
               <button key={chip}
                 onClick={() => onAmenity(amenity === chip.toLowerCase() ? "" : chip.toLowerCase())}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                className={`px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors ${
                   amenity === chip.toLowerCase()
                     ? "bg-[var(--color-forest)] text-white border-[var(--color-forest)]"
                     : "border-[var(--border)] text-[var(--text-muted)]"
@@ -146,20 +146,20 @@ function FilterSheet({
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Min</label>
+              <label className="text-[13px] text-[var(--text-muted)] uppercase tracking-wide">Min</label>
               <input type="range" min={0} max={50000} step={500}
                 value={minPrice || 0}
                 onChange={e => onMinPrice(e.target.value === "0" ? "" : e.target.value)}
                 className="w-full mt-2 accent-[var(--color-forest)]" />
-              <p className="text-[10px] text-[var(--text-muted)] mt-1">KES {Number(minPrice || 0).toLocaleString()}</p>
+              <p className="text-[13px] text-[var(--text-muted)] mt-1">KES {Number(minPrice || 0).toLocaleString()}</p>
             </div>
             <div className="flex-1">
-              <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Max</label>
+              <label className="text-[13px] text-[var(--text-muted)] uppercase tracking-wide">Max</label>
               <input type="range" min={0} max={100000} step={500}
                 value={maxPrice || 100000}
                 onChange={e => onMaxPrice(e.target.value === "100000" ? "" : e.target.value)}
                 className="w-full mt-2 accent-[var(--color-forest)]" />
-              <p className="text-[10px] text-[var(--text-muted)] mt-1">KES {Number(maxPrice || 100000).toLocaleString()}</p>
+              <p className="text-[13px] text-[var(--text-muted)] mt-1">KES {Number(maxPrice || 100000).toLocaleString()}</p>
             </div>
           </div>
           {/* Quick price presets */}
@@ -167,7 +167,7 @@ function FilterSheet({
             {[["Budget",0,5000],["Mid",5000,15000],["Luxury",15000,0]].map(([label, min, max]) => (
               <button key={label as string}
                 onClick={() => { onMinPrice(min ? String(min) : ""); onMaxPrice(max ? String(max) : ""); }}
-                className="px-3 py-1 rounded-full text-[11px] font-medium border border-[var(--border)] text-[var(--text-muted)]">
+                className="px-3 py-1 rounded-full text-[13px] font-medium border border-[var(--border)] text-[var(--text-muted)]">
                 {label as string}
               </button>
             ))}
@@ -274,7 +274,7 @@ export default function Search() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pt-14 pb-20">
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-20 pb-20">
 
       {/* ── Header ── */}
       <div className="sticky top-0 z-40 bg-[var(--bg-surface)] border-b border-[var(--border)]">
@@ -330,7 +330,7 @@ export default function Search() {
             </svg>
             Filters
             {activeFilterCount > 0 && (
-              <span className="bg-white text-[var(--color-forest)] w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center">
+              <span className="bg-white text-[var(--color-forest)] w-4 h-4 rounded-full text-[12px] font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -374,7 +374,7 @@ export default function Search() {
           {/* Active filter tags */}
           {typeFilters.map(t => (
             <button key={t} onClick={() => setTypeFilters(f => f.filter(x => x !== t))}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-semibold bg-[var(--color-forest)]/15 text-[var(--color-teal)] border border-[var(--color-teal)]/30">
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[13px] font-semibold bg-[var(--color-forest)]/15 text-[var(--color-teal)] border border-[var(--color-teal)]/30">
               {t} ×
             </button>
           ))}
@@ -396,7 +396,7 @@ export default function Search() {
                   else { p.set("check_in", friStr); p.set("check_out", sunStr); }
                   return p;
                 })}
-                className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-semibold border transition-colors ${
+                className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${
                   isActive ? "bg-[var(--color-forest)] text-white border-[var(--color-forest)]" : "border-[var(--border)] text-[var(--text-muted)] bg-[var(--bg-surface)]"
                 }`}>
                 🏖 Weekend
@@ -422,7 +422,7 @@ export default function Search() {
               {location ? ` · "${location}"` : ""}
             </p>
             {checkIn && checkOut && (
-              <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              <p className="text-[13px] text-[var(--text-muted)] mt-0.5">
                 Homes with existing bookings on those dates are hidden
               </p>
             )}
@@ -473,7 +473,7 @@ export default function Search() {
                 }));
               return <LeafletMap pins={pins} height={420} />;
             })()}
-            <p className="text-[10px] text-[var(--text-muted)] text-center mt-2">Tap a price pin to view the listing</p>
+            <p className="text-[13px] text-[var(--text-muted)] text-center mt-2">Tap a price pin to view the listing</p>
           </>
         )}
 

@@ -1,6 +1,7 @@
 from typing import Optional
-from datetime import date
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, extract
 from sqlalchemy.orm import selectinload
@@ -274,3 +275,50 @@ async def update_property(
     await db.commit()
     await db.refresh(prop)
     return prop
+
+
+# ── Dynamic sitemap ────────────────────────────────────────────────────────────
+
+BASE = "https://staynaivasha.co.ke"
+
+STATIC_PAGES = [
+    ("/",                    "1.0",  "daily"),
+    ("/search",              "0.9",  "daily"),
+    ("/how-it-works",        "0.8",  "monthly"),
+    ("/about",               "0.7",  "monthly"),
+    ("/list-your-property",  "0.7",  "monthly"),
+    ("/terms",               "0.4",  "yearly"),
+    ("/privacy",             "0.4",  "yearly"),
+]
+
+@router.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml(db: AsyncSession = Depends(get_db)):
+    today = datetime.now(timezone.utc).date().isoformat()
+    urls: list[tuple[str, str, str, str]] = []   # (loc, lastmod, changefreq, priority)
+
+    for path, priority, freq in STATIC_PAGES:
+        urls.append((f"{BASE}{path}", today, freq, priority))
+
+    result = await db.execute(
+        select(Property.id, Property.created_at)
+        .where(Property.active == True)
+        .order_by(Property.created_at.desc())
+    )
+    for prop_id, created_at in result.all():
+        lastmod = created_at.date().isoformat() if created_at else today
+        urls.append((f"{BASE}/property/{prop_id}", lastmod, "weekly", "0.9"))
+
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
+             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for loc, lastmod, freq, priority in urls:
+        lines.append(
+            f"  <url>"
+            f"<loc>{loc}</loc>"
+            f"<lastmod>{lastmod}</lastmod>"
+            f"<changefreq>{freq}</changefreq>"
+            f"<priority>{priority}</priority>"
+            f"</url>"
+        )
+    lines.append("</urlset>")
+
+    return Response("\n".join(lines), media_type="application/xml")

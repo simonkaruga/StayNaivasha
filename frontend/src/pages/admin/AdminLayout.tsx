@@ -315,7 +315,7 @@ function Applications() {
                 <p className="font-semibold text-[var(--text-primary)] text-sm">{a.full_name}</p>
                 <p className="text-xs text-[var(--text-muted)]">{a.phone} {a.email ? `· ${a.email}` : ""}</p>
               </div>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+              <span className={`text-[13px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
                 a.status === "pending" ? "bg-yellow-100 text-yellow-700" :
                 a.status === "approved" ? "bg-green-100 text-green-700" :
                 "bg-red-100 text-red-600"

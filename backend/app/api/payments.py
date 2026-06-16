@@ -164,3 +164,4 @@ async def trigger_payout():
     # Intentional no-op — B2C payouts and refunds are driven exclusively by
     # Celery tasks (release_escrow_payout, process_refund) which call the
     # Daraja B2C API directly. This endpoint exists only for documentation.
+    pass

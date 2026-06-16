@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { ShieldCheck, Smartphone } from "lucide-react";
 import { imgSrc } from "../utils/image";
 
 interface PropertySummary {
@@ -36,6 +37,10 @@ export default function Booking() {
   const [promo,         setPromo]         = useState("");
   const [promoApplied,  setPromoApplied]  = useState(false);
   const [discount,      setDiscount]      = useState(0);
+  const [isCorporate,   setIsCorporate]   = useState(false);
+  const [groupName,     setGroupName]     = useState("");
+  const [companyName,   setCompanyName]   = useState("");
+  const [kraPin,        setKraPin]        = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState("");
@@ -79,6 +84,10 @@ export default function Booking() {
         body: JSON.stringify({
           property_id: id, check_in: checkIn, check_out: checkOut,
           guests, promo_code: promo || undefined, terms_accepted: true,
+          group_name:   groupName   || undefined,
+          is_corporate: isCorporate,
+          company_name: isCorporate ? companyName : undefined,
+          kra_pin:      isCorporate ? kraPin      : undefined,
         }),
       });
       if (bookingRes.status === 401) {
@@ -112,10 +121,10 @@ export default function Booking() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pb-8">
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-20 pb-8">
 
-      {/* Header */}
-      <div className="sticky top-0 z-40 flex items-center gap-3 px-4 py-4 bg-[var(--bg-surface)] border-b border-[var(--border)]">
+      {/* Header — sits below the fixed TopBar */}
+      <div className="sticky top-20 z-40 flex items-center gap-3 px-4 py-4 bg-[var(--bg-surface)] border-b border-[var(--border)]">
         <button onClick={() => navigate(-1)}
           className="w-9 h-9 rounded-full bg-[var(--bg-primary)] flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -150,7 +159,7 @@ export default function Booking() {
         {/* Dates pill */}
         <div className="mx-4 -mt-4 relative z-10 bg-[var(--bg-surface)] rounded-2xl shadow-lg px-4 py-3 flex items-center justify-between">
           <div className="text-center">
-            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide font-medium">Check-in</p>
+            <p className="text-[13px] text-[var(--text-muted)] uppercase tracking-wide font-medium">Check-in</p>
             <p className="text-sm font-bold text-[var(--text-primary)] mt-0.5">{fmtDate(checkIn)}</p>
           </div>
           <div className="flex items-center gap-1 text-[var(--text-muted)]">
@@ -159,7 +168,7 @@ export default function Booking() {
             <div className="w-8 h-px bg-[var(--border)]" />
           </div>
           <div className="text-center">
-            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide font-medium">Check-out</p>
+            <p className="text-[13px] text-[var(--text-muted)] uppercase tracking-wide font-medium">Check-out</p>
             <p className="text-sm font-bold text-[var(--text-primary)] mt-0.5">{fmtDate(checkOut)}</p>
           </div>
         </div>
@@ -190,6 +199,46 @@ export default function Booking() {
               <button onClick={() => setGuests(g => Math.min(20, g + 1))}
                 className="w-9 h-9 rounded-full border-2 border-[var(--border)] text-[var(--text-primary)] flex items-center justify-center text-xl font-light leading-none">+</button>
             </div>
+          </div>
+
+          {/* Group / corporate booking */}
+          <div className="bg-[var(--bg-surface)] rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Group or corporate booking?</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">Retreats, offsite, family reunions, church trips</p>
+              </div>
+              <button type="button" onClick={() => setIsCorporate(v => !v)}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${isCorporate ? "bg-[var(--color-forest)]" : "bg-[var(--border)]"}`}>
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isCorporate ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+
+            {isCorporate && (
+              <div className="space-y-3 pt-1">
+                <div>
+                  <p className="text-xs text-[var(--text-muted)] font-medium mb-1">Trip / group name</p>
+                  <input value={groupName} onChange={e => setGroupName(e.target.value)}
+                    placeholder="e.g. Safaricom Q3 Offsite"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[var(--color-teal)]" />
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--text-muted)] font-medium mb-1">Company name <span className="text-[var(--color-teal)]">(for invoice)</span></p>
+                  <input value={companyName} onChange={e => setCompanyName(e.target.value)}
+                    placeholder="e.g. Safaricom PLC"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[var(--color-teal)]" />
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--text-muted)] font-medium mb-1">KRA PIN <span className="text-[var(--color-teal)]">(for tax invoice)</span></p>
+                  <input value={kraPin} onChange={e => setKraPin(e.target.value.toUpperCase())}
+                    placeholder="e.g. P051234567A"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] rounded-xl px-3 py-2.5 text-sm font-mono outline-none focus:border-[var(--color-teal)]" />
+                </div>
+                <p className="text-[13px] text-[var(--text-muted)]">
+                  A formal invoice with KRA PIN will be generated and sent to your email after check-in.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Promo code */}
@@ -248,6 +297,20 @@ export default function Booking() {
             </div>
           )}
 
+          {/* Escrow protection */}
+          <div className="rounded-2xl p-4 flex items-start gap-3"
+            style={{ background: "rgba(30,74,34,0.06)", border: "1px solid rgba(30,74,34,0.15)" }}>
+            <ShieldCheck size={20} className="flex-shrink-0 text-[var(--color-forest)]" />
+            <div>
+              <p className="text-sm font-semibold text-[var(--color-forest)]">Your payment is protected</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                KES {total.toLocaleString()} is held safely by StayNaivasha — not released to the owner
+                until you physically arrive and check in. If the property doesn't match what was advertised,
+                you get a full refund within 1 hour.
+              </p>
+            </div>
+          </div>
+
           {/* M-Pesa CTA */}
           <button onClick={handleConfirm} disabled={loading || !termsAccepted}
             className="w-full flex items-center justify-center gap-3 text-white font-bold py-4 rounded-2xl transition-all active:scale-[.98] disabled:opacity-50"
@@ -257,7 +320,7 @@ export default function Booking() {
             }}>
             {loading
               ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending prompt…</>
-              : <><span className="text-lg">📱</span> Pay KES {total.toLocaleString()} via M-Pesa</>
+              : <><Smartphone size={18} /> Pay KES {total.toLocaleString()} via M-Pesa</>
             }
           </button>
 

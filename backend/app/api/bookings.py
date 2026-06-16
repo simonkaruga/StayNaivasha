@@ -107,11 +107,30 @@ async def create_booking(
         platform_fee=PLATFORM_FEE_KES,
         deposit_amount=deposit,
         promo_code_id=promo_id,
+        guests=body.guests,
+        group_name=body.group_name,
+        is_corporate=body.is_corporate,
+        company_name=body.company_name,
+        kra_pin=body.kra_pin,
         status="pending",
         checkin_code=_checkin_code(),
         terms_accepted_at=datetime.now(timezone.utc),
     )
     db.add(booking)
+
+    # Write blocked dates to availability table immediately so no other guest
+    # (on StayNaivasha or via next iCal sync) can double-book these dates.
+    from datetime import date as date_type, timedelta
+    current = body.check_in
+    while current < body.check_out:
+        db.add(Availability(
+            property_id=prop.id,
+            date=current,
+            is_blocked=True,
+            source="booking",
+        ))
+        current += timedelta(days=1)
+
     await db.commit()
     await db.refresh(booking)
     return booking
@@ -122,12 +141,18 @@ async def my_bookings(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Booking)
+    rows = (await db.execute(
+        select(Booking, Property.title.label("property_title"))
+        .join(Property, Booking.property_id == Property.id)
         .where(Booking.guest_id == user.id)
         .order_by(Booking.created_at.desc())
-    )
-    return result.scalars().all()
+    )).all()
+    result = []
+    for booking, title in rows:
+        d = {k: v for k, v in vars(booking).items() if not k.startswith("_")}
+        d["property_title"] = title
+        result.append(d)
+    return result
 
 
 @router.get("/{booking_id}", response_model=BookingOut)

@@ -1,4 +1,5 @@
 import { useNavigate, Link } from "react-router-dom";
+import { Home as HomeIcon, Calendar, Smartphone, Lock, CheckCircle2, Building2, Banknote, BadgeCheck, ClipboardCheck } from "lucide-react";
 import { useSEO } from "../utils/seo";
 
 export default function HowItWorks() {
@@ -26,7 +27,7 @@ export default function HowItWorks() {
 
         {/* Hero blurb */}
         <div className="space-y-2">
-          <p className="text-[10px] text-[var(--color-teal)] font-semibold tracking-[0.25em] uppercase">Kenya's local-first platform</p>
+          <p className="text-[13px] text-[var(--color-teal)] font-semibold tracking-[0.25em] uppercase">Kenya's local-first platform</p>
           <h2 className="font-display italic text-3xl text-[var(--text-primary)] leading-tight">
             Book in 30 seconds.<br />Pay via M-Pesa.<br />Protected always.
           </h2>
@@ -44,39 +45,17 @@ export default function HowItWorks() {
           </h3>
 
           {[
-            {
-              n: "1",
-              title: "Browse verified homes",
-              body: "Every property is reviewed by the StayNaivasha team before going live. Photos are approved, GPS coordinates confirmed, and the owner's identity checked.",
-              icon: "🏡",
-            },
-            {
-              n: "2",
-              title: "Pick your dates & guests",
-              body: "Select check-in and check-out dates on the real-time availability calendar. Dates blocked by other bookings or the owner are greyed out automatically.",
-              icon: "📅",
-            },
-            {
-              n: "3",
-              title: "Pay via M-Pesa STK Push",
-              body: "Tap Reserve and you'll receive an M-Pesa prompt on your phone. Enter your PIN — the whole process takes under 30 seconds. KES only, no card needed.",
-              icon: "📱",
-            },
-            {
-              n: "4",
-              title: "Your money is held in escrow",
-              body: "Your payment is held securely and NOT released to the owner until you check in. If anything goes wrong before arrival, you are protected.",
-              icon: "🔒",
-            },
-            {
-              n: "5",
-              title: "Check in with your code",
-              body: "After booking you receive a 4-digit check-in code. Show it to the owner on arrival. They enter it to confirm you're there — which triggers the payout.",
-              icon: "✅",
-            },
+            { n: "1", title: "Browse verified homes",       body: "Every property is reviewed by the StayNaivasha team before going live. Photos are approved, GPS coordinates confirmed, and the owner's identity checked.", Icon: HomeIcon,      color: "#1e4a22" },
+            { n: "2", title: "Pick your dates & guests",    body: "Select check-in and check-out dates on the real-time availability calendar. Dates blocked by other bookings or the owner are greyed out automatically.",  Icon: Calendar,      color: "#186878" },
+            { n: "3", title: "Pay via M-Pesa STK Push",     body: "Tap Reserve and you'll receive an M-Pesa prompt on your phone. Enter your PIN — the whole process takes under 30 seconds. KES only, no card needed.",    Icon: Smartphone,    color: "#3ec890" },
+            { n: "4", title: "Your money is held in escrow", body: "Your payment is held securely and NOT released to the owner until you check in. If anything goes wrong before arrival, you are protected.",              Icon: Lock,          color: "#d4892a" },
+            { n: "5", title: "Check in with your code",     body: "After booking you receive a 4-digit check-in code. Show it to the owner on arrival. They enter it to confirm you're there — which triggers the payout.", Icon: CheckCircle2,  color: "#1e4a22" },
           ].map(step => (
             <div key={step.n} className="flex gap-4 bg-[var(--bg-surface)] rounded-2xl p-4 border border-[var(--border)]">
-              <span className="text-2xl flex-shrink-0 mt-0.5">{step.icon}</span>
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ background: `${step.color}15` }}>
+                <step.Icon size={18} style={{ color: step.color }} />
+              </span>
               <div>
                 <p className="font-semibold text-[var(--text-primary)] text-sm">{step.title}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">{step.body}</p>
@@ -93,29 +72,16 @@ export default function HowItWorks() {
           </h3>
 
           {[
-            {
-              title: "List for free",
-              body: "Creating a listing is free. Zero commission for your first 3 months. After that, a flat KES 300 convenience fee per booking — that's it.",
-              icon: "✍️",
-            },
-            {
-              title: "AI writes your description",
-              body: "Tell our AI what you have — bedrooms, amenities, views — and it writes a compelling description in seconds. You can edit it before publishing.",
-              icon: "🤖",
-            },
-            {
-              title: "Get verified for more bookings",
-              body: "Verified tier 2 properties appear higher in search and get a Verified badge. The process takes 24–48 hours and involves a photo review.",
-              icon: "🏅",
-            },
-            {
-              title: "Payout within 2 hours of check-in",
-              body: "Once a guest checks in and their 4-digit code is confirmed, the escrow is released to your M-Pesa within 2 hours. No waiting days.",
-              icon: "💸",
-            },
+            { title: "List for free",                  body: "Creating a listing is free. Zero commission for your first 2 months. After that, a flat KES 300 convenience fee per booking — that's it.",             Icon: ClipboardCheck, color: "#1e4a22" },
+            { title: "AI writes your description",     body: "Tell our AI what you have — bedrooms, amenities, views — and it writes a compelling description in seconds. You can edit it before publishing.",           Icon: Building2,      color: "#186878" },
+            { title: "Get verified for more bookings", body: "Verified tier 2 properties appear higher in search and get a Verified badge. The process takes 24–48 hours and involves a photo review.",                  Icon: BadgeCheck,     color: "#d4892a" },
+            { title: "Payout within 2 hours",          body: "Once a guest checks in and their 4-digit code is confirmed, the escrow is released to your M-Pesa within 2 hours. No waiting days.",                       Icon: Banknote,       color: "#3ec890" },
           ].map(step => (
             <div key={step.title} className="flex gap-4 bg-[var(--bg-surface)] rounded-2xl p-4 border border-[var(--border)]">
-              <span className="text-2xl flex-shrink-0 mt-0.5">{step.icon}</span>
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ background: `${step.color}15` }}>
+                <step.Icon size={18} style={{ color: step.color }} />
+              </span>
               <div>
                 <p className="font-semibold text-[var(--text-primary)] text-sm">{step.title}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">{step.body}</p>

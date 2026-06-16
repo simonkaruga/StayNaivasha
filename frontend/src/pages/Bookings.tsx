@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, Link } from "react-router-dom";
-import { Clock, CheckCircle, Home as HomeIcon, CheckCircle2, XCircle } from "lucide-react";
+import { Clock, CheckCircle, Home as HomeIcon, CheckCircle2, XCircle, LockKeyhole } from "lucide-react";
 import { generateBookingPDF } from "../utils/pdf";
 
 interface Booking {
-  id: string; property_id: string;
+  id: string; property_id: string; property_title?: string;
   check_in: string; check_out: string;
-  total_amount: number; status: string;
+  total_amount: number; platform_fee: number; status: string;
   checkin_code: string | null; mpesa_ref: string | null;
 }
 
@@ -122,14 +122,17 @@ function BookingCard({ b, onReview, onCancel, cancelling, confirmCancel, onCance
               <span className="text-sm leading-none" aria-hidden="true">{s.icon}</span>
               <span className={`text-xs font-semibold ${s.text}`}>{s.label}</span>
             </div>
-            <p className="text-sm font-bold text-[var(--text-primary)]">
+            {b.property_title && (
+              <p className="font-semibold text-[var(--text-primary)] text-sm leading-snug mb-0.5 line-clamp-1">{b.property_title}</p>
+            )}
+            <p className="text-[13px] text-[var(--text-muted)]">
               {fmtDate(b.check_in)} → {fmtDate(b.check_out)}
-              <span className="font-normal text-[var(--text-muted)] text-xs ml-1.5">{Math.round(nights)} nights</span>
+              <span className="ml-1.5">{Math.round(nights)} nights</span>
             </p>
           </div>
           <div className="text-right flex-shrink-0">
             <p className="text-sm font-bold text-[var(--text-primary)]">KES {b.total_amount.toLocaleString()}</p>
-            {b.mpesa_ref && <p className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">{b.mpesa_ref}</p>}
+            {b.mpesa_ref && <p className="text-[13px] text-[var(--text-muted)] font-mono mt-0.5">{b.mpesa_ref}</p>}
           </div>
         </div>
 
@@ -181,7 +184,7 @@ function BookingCard({ b, onReview, onCancel, cancelling, confirmCancel, onCance
         {/* Actions */}
         <div className="flex gap-2 pt-1">
           {(b.status === "confirmed" || b.status === "completed") && (
-            <button onClick={() => generateBookingPDF({ ...b, checkin_code: b.checkin_code ?? "" })}
+            <button onClick={() => generateBookingPDF({ ...b, checkin_code: b.checkin_code ?? "", platform_fee: b.platform_fee ?? 0 })}
               className="flex-1 flex items-center justify-center gap-1.5 border border-[var(--border)] text-[var(--text-muted)] text-xs py-2.5 rounded-xl font-medium">
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
@@ -254,7 +257,9 @@ export default function Bookings() {
 
   if (error?.message === "unauth") return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col items-center justify-center px-6 pb-20 text-center space-y-4">
-      <div className="w-16 h-16 rounded-full bg-[var(--bg-surface)] flex items-center justify-center text-3xl">🔐</div>
+      <div className="w-16 h-16 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
+        <LockKeyhole className="w-7 h-7 text-[var(--text-muted)]" />
+      </div>
       <p className="font-semibold text-[var(--text-primary)]">Sign in to see your bookings</p>
       <button onClick={() => navigate("/profile")}
         className="bg-[var(--color-forest)] text-white text-sm font-bold px-8 py-3.5 rounded-2xl">
@@ -279,7 +284,7 @@ export default function Bookings() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pt-14 pb-6">
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-20 pb-6">
 
       {/* Header */}
       <div className="sticky top-0 z-40 bg-[var(--bg-surface)] border-b border-[var(--border)]">
@@ -320,10 +325,10 @@ export default function Bookings() {
           <span className="text-xl flex-shrink-0">✍️</span>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-[var(--text-primary)]">You have completed stays</p>
-            <p className="text-[11px] text-[var(--text-muted)]">Leave a review — it helps other guests and rewards great hosts.</p>
+            <p className="text-[13px] text-[var(--text-muted)]">Leave a review — it helps other guests and rewards great hosts.</p>
           </div>
           <button onClick={() => setTab("completed")}
-            className="flex-shrink-0 text-[11px] font-bold text-amber-700 underline underline-offset-2">
+            className="flex-shrink-0 text-[13px] font-bold text-amber-700 underline underline-offset-2">
             Review
           </button>
         </div>
