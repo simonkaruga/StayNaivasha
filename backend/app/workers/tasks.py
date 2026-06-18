@@ -388,6 +388,97 @@ async def _process_refund_async(booking_id: str, refund_amount: int) -> None:
             )
 
 
+# ── Booking auto-completion ───────────────────────────────────────────────────
+
+@celery.task
+def auto_complete_bookings() -> None:
+    """
+    Runs nightly at 2 am EAT. Three cases:
+    1. checked_in  + check_out <= today  → completed         (enables review)
+    2. confirmed   + check_out <  today  → completed + payout (guest no-show)
+    3. pending     + created   >  30 min → cancelled, dates freed
+    """
+    asyncio.run(_auto_complete_async())
+
+
+async def _auto_complete_async() -> None:
+    from datetime import date, datetime, timezone, timedelta
+    from sqlalchemy import select, delete as sa_delete
+    from app.core.database import AsyncSessionLocal
+    from app.core.audit_log import log_event
+    from app.models.models import Booking, Availability, User, Property
+
+    today        = date.today()
+    now          = datetime.now(timezone.utc)
+    stale_cutoff = now - timedelta(minutes=30)
+
+    async with AsyncSessionLocal() as db:
+
+        # ── 1. checked_in → completed ─────────────────────────────────────────
+        checked_in = (await db.execute(
+            select(Booking).where(
+                Booking.status == "checked_in",
+                Booking.check_out <= today,
+            )
+        )).scalars().all()
+
+        for b in checked_in:
+            b.status = "completed"
+            await log_event(db, "booking_auto_completed", b.id, None,
+                            {"reason": "checkout_passed"})
+
+        # ── 2. confirmed (no-show) → completed + release payout ──────────────
+        no_shows = (await db.execute(
+            select(Booking).where(
+                Booking.status == "confirmed",
+                Booking.check_out < today,
+            )
+        )).scalars().all()
+
+        for b in no_shows:
+            b.status = "completed"
+            await log_event(db, "booking_auto_completed", b.id, None,
+                            {"reason": "guest_no_show"})
+
+            # Only release payout if M-Pesa payment was received
+            if b.mpesa_ref:
+                release_escrow_payout.delay(b.id)
+
+            # Notify owner
+            prop  = (await db.execute(select(Property).where(Property.id == b.property_id))).scalar_one_or_none()
+            owner = (await db.execute(select(User).where(User.id == prop.owner_id))).scalar_one_or_none() if prop else None
+            if owner and prop:
+                await _notify(
+                    owner.phone,
+                    f"Payout processing: {prop.title} ({b.check_in} – {b.check_out}). KES {b.total_amount - b.platform_fee:,} via M-Pesa.",
+                    (
+                        f"✅ *Payout Processing*\n\n"
+                        f"🏡 *{prop.title}*\n"
+                        f"📅 {b.check_in} → {b.check_out}\n\n"
+                        f"Your payout of *KES {b.total_amount - b.platform_fee:,}* is on its way.\n"
+                        f"— StayNaivasha 🌿"
+                    ),
+                )
+
+        # ── 3. pending (unpaid) → cancelled, dates freed ──────────────────────
+        stale = (await db.execute(
+            select(Booking).where(
+                Booking.status == "pending",
+                Booking.created_at <= stale_cutoff,
+            )
+        )).scalars().all()
+
+        for b in stale:
+            b.status = "cancelled"
+            await db.execute(
+                sa_delete(Availability).where(Availability.booking_id == b.id)
+            )
+            await log_event(db, "booking_auto_cancelled", b.id, None,
+                            {"reason": "payment_timeout"})
+
+        await db.commit()
+
+
 # ── Check-in reminders ────────────────────────────────────────────────────────
 
 @celery.task

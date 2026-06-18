@@ -8,11 +8,15 @@ celery = Celery("staynaivasha", broker=settings.REDIS_URL, backend=settings.REDI
 celery.conf.beat_schedule = {
     "ical-sync-every-10-min": {
         "task": "app.workers.tasks.sync_all_icals",
-        "schedule": crontab(minute="*/10"),   # every 10 min — narrow external-platform window to ~10 min
+        "schedule": crontab(minute="*/10"),
     },
     "send-checkin-reminders": {
         "task": "app.workers.tasks.send_checkin_reminders",
-        "schedule": crontab(minute=0, hour=8),  # 8am EAT daily
+        "schedule": crontab(minute=0, hour=8),   # 8 am EAT
+    },
+    "auto-complete-bookings": {
+        "task": "app.workers.tasks.auto_complete_bookings",
+        "schedule": crontab(minute=0, hour=2),   # 2 am EAT — quiet hours
     },
 }
 celery.conf.timezone = "Africa/Nairobi"

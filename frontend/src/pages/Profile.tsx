@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { CalendarDays, Heart, MessageCircle, Eye, EyeOff, Mail } from "lucide-react";
+import { CalendarDays, Heart, MessageCircle, Eye, EyeOff, Mail, Bell, BellOff, Phone } from "lucide-react";
 
 interface Me {
-  user_id: string;
-  role:    string;
-  phone?:  string;
-  name?:   string;
-  email?:  string;
+  user_id:    string;
+  role:       string;
+  phone?:     string;
+  name?:      string;
+  email?:     string;
+  sms_opt_in: boolean;
 }
 
 async function fetchMe(): Promise<Me> {
@@ -49,9 +50,11 @@ function OTPInput({ value, onChange }: { value: string; onChange: (v: string) =>
 function ProfileEditSheet({ me, onClose, onSaved }: {
   me: Me; onClose: () => void; onSaved: () => void;
 }) {
-  const [name,  setName]  = useState(me.name ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError]  = useState("");
+  const [name,      setName]      = useState(me.name ?? "");
+  const [phone,     setPhone]     = useState(me.phone ?? "");
+  const [smsOptIn,  setSmsOptIn]  = useState(me.sms_opt_in ?? true);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState("");
 
   async function save() {
     setSaving(true); setError("");
@@ -59,7 +62,11 @@ function ProfileEditSheet({ me, onClose, onSaved }: {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ name: name.trim() || null }),
+      body: JSON.stringify({
+        name:       name.trim() || null,
+        phone:      phone.trim() || null,
+        sms_opt_in: smsOptIn,
+      }),
     });
     setSaving(false);
     if (r.ok) { onSaved(); onClose(); }
@@ -76,15 +83,49 @@ function ProfileEditSheet({ me, onClose, onSaved }: {
           <h2 className="font-semibold text-[var(--text-primary)]">Edit profile</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-[var(--bg-primary)] flex items-center justify-center text-[var(--text-muted)]">✕</button>
         </div>
+
         <div className="space-y-1">
           <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide block">Display name</label>
           <input
             value={name} onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && save()}
             placeholder="Your name" autoFocus
             className="w-full bg-[var(--bg-primary)] border-2 border-[var(--border)] focus:border-[var(--color-teal)] rounded-2xl px-4 py-3 text-[var(--text-primary)] outline-none transition-colors"
           />
         </div>
+
+        <div className="space-y-1">
+          <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide block">Phone number</label>
+          <div className="flex items-center bg-[var(--bg-primary)] border-2 border-[var(--border)] focus-within:border-[var(--color-teal)] rounded-2xl px-4 overflow-hidden transition-colors">
+            <span className="text-lg mr-2 flex-shrink-0" role="img" aria-label="Kenya">🇰🇪</span>
+            <input
+              type="tel" value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+254 712 345 678"
+              className="flex-1 bg-transparent text-[var(--text-primary)] py-3 outline-none text-base"
+            />
+          </div>
+          <p className="text-[11px] text-[var(--text-muted)] px-1">Used for booking confirmations and check-in codes via SMS/WhatsApp</p>
+        </div>
+
+        <div className="flex items-center justify-between bg-[var(--bg-primary)] rounded-2xl px-4 py-3.5">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${smsOptIn ? "bg-[var(--color-forest)]/10" : "bg-[var(--border)]"}`}>
+              {smsOptIn
+                ? <Bell className="w-4 h-4 text-[var(--color-forest)]" />
+                : <BellOff className="w-4 h-4 text-[var(--text-muted)]" />
+              }
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">SMS notifications</p>
+              <p className="text-[11px] text-[var(--text-muted)]">Booking updates, check-in codes</p>
+            </div>
+          </div>
+          <button type="button" role="switch" aria-checked={smsOptIn} onClick={() => setSmsOptIn(v => !v)}
+            className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${smsOptIn ? "bg-[var(--color-forest)]" : "bg-[var(--border)]"}`}>
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${smsOptIn ? "translate-x-6" : "translate-x-0"}`} />
+          </button>
+        </div>
+
         {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-3 py-2">{error}</p>}
         <button onClick={save} disabled={saving}
           className="w-full bg-[var(--color-forest)] disabled:bg-gray-300 text-white font-bold py-4 rounded-2xl text-sm">
@@ -313,6 +354,31 @@ export default function Profile() {
             </div>
             {chevron}
           </Link>
+        </div>
+
+        <div className="bg-[var(--bg-surface)] rounded-3xl overflow-hidden border border-[var(--border)]">
+          <button onClick={() => setEditingProfile(true)}
+            className="w-full flex items-center gap-4 px-4 py-4 active:bg-[var(--bg-primary)] transition-colors text-left">
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${me.phone ? "bg-[var(--color-forest)]/10" : "bg-amber-50 dark:bg-amber-900/20"}`}>
+              <Phone className={`w-5 h-5 ${me.phone ? "text-[var(--color-forest)]" : "text-amber-500"}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[var(--text-primary)] text-sm">
+                {me.phone ? "Phone & notifications" : "Add phone number"}
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">
+                {me.phone
+                  ? `${me.phone} · SMS ${me.sms_opt_in ? "on" : "off"}`
+                  : "Required for booking confirmations"}
+              </p>
+            </div>
+            {!me.phone && (
+              <span className="flex-shrink-0 text-[11px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full">
+                Missing
+              </span>
+            )}
+            {me.phone && chevron}
+          </button>
         </div>
 
         <div className="bg-[var(--bg-surface)] rounded-3xl overflow-hidden border border-[var(--border)]">

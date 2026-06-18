@@ -33,6 +33,7 @@ class User(Base):
     national_id_url: Mapped[Optional[str]] = mapped_column(String(500))
     passport_number: Mapped[Optional[str]] = mapped_column(String(50))
     fcm_token: Mapped[Optional[str]] = mapped_column(String(500))
+    sms_opt_in: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

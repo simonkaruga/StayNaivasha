@@ -120,6 +120,7 @@ async def create_booking(
 
     # Write blocked dates to availability table immediately so no other guest
     # (on StayNaivasha or via next iCal sync) can double-book these dates.
+    # booking_id is set so cancel/expire tasks can delete these rows cleanly.
     from datetime import date as date_type, timedelta
     current = body.check_in
     while current < body.check_out:
@@ -128,6 +129,7 @@ async def create_booking(
             date=current,
             is_blocked=True,
             source="booking",
+            booking_id=booking.id,
         ))
         current += timedelta(days=1)
 

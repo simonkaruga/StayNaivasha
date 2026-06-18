@@ -18,6 +18,7 @@ class TokenResponse(BaseModel):
     phone: Optional[str] = None
     name: Optional[str] = None
     email: Optional[str] = None
+    sms_opt_in: bool = True
 
 
 # ── Properties ───────────────────────────────────────────────────────────────

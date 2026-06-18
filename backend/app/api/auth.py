@@ -58,7 +58,8 @@ def _set_cookies(response: Response, access: str, refresh: str) -> None:
 
 def _token_resp(user: User) -> TokenResponse:
     return TokenResponse(user_id=user.id, role=user.role, phone=user.phone,
-                         name=user.name, email=user.email)
+                         name=user.name, email=user.email,
+                         sms_opt_in=getattr(user, "sms_opt_in", True))
 
 async def _issue_tokens(user: User, response: Response) -> TokenResponse:
     access  = create_access_token(user.id)
@@ -116,6 +117,8 @@ async def get_me(user: User = Depends(get_current_user_optional)):
 class ProfileUpdate(BaseModel):
     name:  Optional[str] = None
     email: Optional[str] = None
+    phone: Optional[str] = None
+    sms_opt_in: Optional[bool] = None
 
 @router.put("/me", response_model=TokenResponse)
 async def update_profile(
@@ -129,6 +132,14 @@ async def update_profile(
         user.name = body.name.strip() or None
     if body.email is not None:
         user.email = body.email.strip().lower() or None
+    if body.phone is not None:
+        # normalise: strip spaces, ensure +254 prefix
+        ph = body.phone.strip().replace(" ", "")
+        if ph.startswith("0") and len(ph) == 10:
+            ph = "+254" + ph[1:]
+        user.phone = ph or None
+    if body.sms_opt_in is not None:
+        user.sms_opt_in = body.sms_opt_in
     await db.commit()
     await db.refresh(user)
     return _token_resp(user)
